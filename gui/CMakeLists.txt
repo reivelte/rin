@@ -7,6 +7,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 find_package(suzuri)
+find_package(SQLite3 REQUIRED)
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Svg)
 
 set(SOURCES #!BEGIN: SOURCE LIST
@@ -74,6 +75,7 @@ target_link_libraries(${PROJECT_NAME}
     Qt6::Gui
     Qt6::Svg
 )
+target_link_libraries(${PROJECT_NAME} SQLite::SQLite3)
 
 target_include_directories(${PROJECT_NAME} PRIVATE "src/")
 

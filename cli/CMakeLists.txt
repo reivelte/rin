@@ -5,6 +5,8 @@ project(rin VERSION 1.0 LANGUAGES CXX)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 find_package(suzuri REQUIRED)
+find_package(SQLite3 REQUIRED)
+find_package(botan REQUIRED)
 
 set(HEADERS #!BEGIN: HEADER LIST
   src/config.hpp
@@ -29,6 +31,7 @@ else()
 endif()
 
 target_link_libraries(${PROJECT_NAME} suzuri)
+target_link_libraries(${PROJECT_NAME} SQLite::SQLite3 botan::botan)
 
 target_include_directories(${PROJECT_NAME} PRIVATE "src/")
 target_include_directories(${PROJECT_NAME} PRIVATE "ext/argparse/include/")

@@ -101,7 +101,6 @@ set(sources #!BEGIN: SOURCE LIST
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources}) # for properly displying directory structure in IDEs
 
-#list(APPEND public_headers "${CMAKE_CURRENT_BINARY_DIR}/src/${PROJECT_NAME}/${export_file_name}")
 list(APPEND sources "${CMAKE_CURRENT_BINARY_DIR}/src/${PROJECT_NAME}/${export_file_name}")
 
 #----------------------------------------------------------------------------------------------------------------------
@@ -135,7 +134,7 @@ target_include_directories(${PROJECT_NAME}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ext/ToruNiina/toml11/include>
     $<BUILD_INTERFACE:${Botan_INCLUDE_DIRS}>
     $<BUILD_INTERFACE:${SQLite3_INCLUDE_DIRS}>
-    # $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   #PRIVATE
   #    "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )

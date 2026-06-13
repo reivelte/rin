@@ -1,6 +1,7 @@
 { 
     stdenv, lib,
     cmake, pkg-config,
+    sqlite, botan3,
     suzuri, rin,
     qt6
 }:
@@ -14,8 +15,9 @@ stdenv.mkDerivation {
     ];
     
     buildInputs = [
+        sqlite
+        botan3
         suzuri
-        rin
         qt6.qtbase
         qt6.qtsvg
     ];

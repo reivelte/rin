@@ -1,6 +1,8 @@
 {
     stdenv, lib,
-    cmake, pkg-config, suzuri
+    cmake, pkg-config,
+    sqlite, botan3,
+    suzuri
 }:
 
 stdenv.mkDerivation {
@@ -12,6 +14,8 @@ stdenv.mkDerivation {
     ];
     
     buildInputs = [
+        sqlite
+        botan3
         suzuri
     ];
     

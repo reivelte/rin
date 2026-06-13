@@ -1048,7 +1048,7 @@ dkms.conf
 
 ######## Added by me
 .clangd
-*sz_export.hpp
+# *sz_export.hpp
 .qt
 .venv
 .python-version
