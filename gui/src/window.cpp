@@ -15,6 +15,7 @@
 #include <QtWidgets/QToolButton>
 #include <QtWidgets/QMenuBar>
 #include <QtWidgets/QFileDialog>
+#include <QtWidgets/QMessageBox>
 #include <QtGui/QDesktopServices>
 #include <QtGui/QImageReader>
 #include <QtGui/QFileSystemModel>
@@ -470,7 +471,21 @@ namespace rin
 
     void main_window::about()
     {
-        qDebug() << "about() rin";
+        QMessageBox msgbox(
+            QMessageBox::Icon::Information,
+            tr("About Rin"),
+            tr("Rin is a tag-centric file browser and data manager."),
+            QMessageBox::StandardButton::Ok,
+            this
+        );
+
+        auto* btn = msgbox.addButton(tr("About Qt"), QMessageBox::ButtonRole::ActionRole);
+        connect(btn, &QPushButton::clicked, this, [&]() -> void
+        {
+            QMessageBox::aboutQt(this);
+        });
+
+        msgbox.exec();
     }
 
     void main_window::select_item(const QModelIndex& index)
