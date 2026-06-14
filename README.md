@@ -53,9 +53,9 @@ While MacOS and Windows builds are possible in theory, I have not tested this on
 for those operating systems at this time. With that being said, a build for MacOS and Linux-based operating systems can be managed using Nix.
 
 ### Using Nix
-This repository contains a flake.nix and flake.lock file. Allowing Nix users to easily build Rin with just the repository's URL:
+This repository contains a flake.nix and flake.lock file. Allowing Nix users to easily build Rin with just the repository's short-hand:
 ```
-nix build https://github.com/reivelte/rin
+nix build github:reivelte/rin
 ```
 
 Alternatively, you can enter a Nix development shell and use the included build.py python script to build a debug verison of the project:
