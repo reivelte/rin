@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <cstdlib>
+#include <sstream>
 #include "config_utils.hpp"
 
 namespace sz
@@ -25,11 +26,11 @@ namespace sz
     SZ_API std::string get_xdg_directory(data_directory_type type)
     {
         using enum data_directory_type;
+#ifdef _WIN32
+        std::filesystem::path user = get_home_directory();
+        return (user / "AppData" / "Local").string();
+#else
         const char* p = nullptr;
-
-        #ifdef _WIN32
-        return {}; // TODO
-        #else
         switch (type)
         {
             case Config: { p = std::getenv("$XDG_CONFIG_HOME"); break; }
@@ -50,7 +51,7 @@ namespace sz
             default: break;
         }
         return {};
-        #endif
+#endif
     }
 
     // TODO: verify some metadata with the database/config files themselves
@@ -61,18 +62,43 @@ namespace sz
         return std::filesystem::exists(path) && name == pname;
     }
 
-    toml_config::toml_config(const std::filesystem::path& p, config_type t) :
-        m_filepath(p), m_type(t)
+    sz::result<toml_config> toml_config::create_or_open(const std::filesystem::path& p, config_type t)
     {
-        if (!std::filesystem::exists(m_filepath))
-        {
-            std::ofstream out(m_filepath);
-            out <<
-                R"toml(
+        toml_config config;
+        auto ret = config.set_config(p, t);
+        
+        if (!ret)
+        { return ret.error(); }
 
-                )toml"
-            << std::endl;
+        return config;
+    }
+
+    toml_config::toml_config(const std::filesystem::path &p, config_type t) : m_filepath(p), m_type(t)
+    {
+        m_init();
+    }
+
+    bool toml_config::has_value(std::string key)
+    {
+        auto data = m_read();
+        if (data)
+        {
+            auto keys = sz::utility::split(".", key);
+            return m_keys_exist(keys, *data);
         }
+        return false;
+    }
+
+    sz::result<void> toml_config::set_config(const std::filesystem::path &p, config_type t)
+    {
+        m_filepath = p;
+        m_type = t;
+        auto data = m_init();
+        
+        if (!data)
+        { return data.error(); }
+
+        return {};
     }
 
     void toml_config::set_window_size(int w, int h)
@@ -172,7 +198,35 @@ namespace sz
         return data.at(keys[0]).at(keys[1]);
     }
 
-    void toml_config::m_write(auto &data)
+    sz::result<toml::ordered_value> toml_config::m_init()
+    {
+        if (!std::filesystem::exists(m_filepath))
+        {
+            std::ofstream out(m_filepath);
+            out <<
+                R"toml(
+
+                )toml"
+            << std::endl;
+        }
+        return m_read();
+    }
+
+    sz::result<toml::ordered_value> toml_config::m_read() const
+    {
+        auto data = toml::try_parse<toml::ordered_type_config>(m_filepath);
+        if (data.is_err())
+        {
+            auto err = data.unwrap_err();
+            std::stringstream ss;
+            for (const auto& e : err)
+            { ss << e << '\n'; }
+            return sz::common_error(sz::result_code::Incomplete_Result, ss.str());
+        }
+        return data.unwrap();
+    }
+
+    void toml_config::m_write(auto& data)
     {
         std::ofstream out(m_filepath);
         out << toml::format(data) << std::endl;

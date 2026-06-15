@@ -64,39 +64,41 @@ generate_export_header(
 )
 
 set(public_headers #!BEGIN: HEADER LIST
-  src/${PROJECT_NAME}/result.hpp
-  src/${PROJECT_NAME}/types.hpp
-  src/${PROJECT_NAME}/basic_vectors.hpp
-  src/${PROJECT_NAME}/sz_export.hpp
   src/${PROJECT_NAME}/exception.hpp
-  src/${PROJECT_NAME}/metadata/tags.hpp
-  src/${PROJECT_NAME}/entity/registry.hpp
+  src/${PROJECT_NAME}/types.hpp
+  src/${PROJECT_NAME}/sz_export.hpp
+  src/${PROJECT_NAME}/basic_vectors.hpp
+  src/${PROJECT_NAME}/result.hpp
   src/${PROJECT_NAME}/entity/database.hpp
   src/${PROJECT_NAME}/entity/entity.hpp
   src/${PROJECT_NAME}/entity/common.hpp
-  src/${PROJECT_NAME}/utility/json.hpp
-  src/${PROJECT_NAME}/utility/files.hpp
-  src/${PROJECT_NAME}/utility/config_utils.hpp
-  src/${PROJECT_NAME}/utility/string.hpp
-  src/${PROJECT_NAME}/utility/hash.hpp
-  src/${PROJECT_NAME}/sqlite/database.hpp
-  src/${PROJECT_NAME}/sqlite/query.hpp
+  src/${PROJECT_NAME}/entity/registry.hpp
   src/${PROJECT_NAME}/sqlite/common.hpp
+  src/${PROJECT_NAME}/sqlite/query.hpp
+  src/${PROJECT_NAME}/sqlite/database.hpp
+  src/${PROJECT_NAME}/utility/files.hpp
+  src/${PROJECT_NAME}/utility/hash.hpp
+  src/${PROJECT_NAME}/utility/string.hpp
+  src/${PROJECT_NAME}/utility/domain.hpp
+  src/${PROJECT_NAME}/utility/config_utils.hpp
+  src/${PROJECT_NAME}/utility/json.hpp
+  src/${PROJECT_NAME}/metadata/tags.hpp
 ) #!END: HEADER LIST
 
 set(sources #!BEGIN: SOURCE LIST
   ${public_headers}
-  src/${PROJECT_NAME}/metadata/tags.cpp
-  src/${PROJECT_NAME}/entity/registry.cpp
-  src/${PROJECT_NAME}/entity/common.cpp
   src/${PROJECT_NAME}/entity/database.cpp
-  src/${PROJECT_NAME}/utility/files.cpp
-  src/${PROJECT_NAME}/utility/json.cpp
-  src/${PROJECT_NAME}/utility/config_utils.cpp
-  src/${PROJECT_NAME}/utility/string.cpp
-  src/${PROJECT_NAME}/utility/hash.cpp
+  src/${PROJECT_NAME}/entity/common.cpp
+  src/${PROJECT_NAME}/entity/registry.cpp
   src/${PROJECT_NAME}/sqlite/database.cpp
   src/${PROJECT_NAME}/sqlite/query.cpp
+  src/${PROJECT_NAME}/utility/string.cpp
+  src/${PROJECT_NAME}/utility/files.cpp
+  src/${PROJECT_NAME}/utility/hash.cpp
+  src/${PROJECT_NAME}/utility/domain.cpp
+  src/${PROJECT_NAME}/utility/config_utils.cpp
+  src/${PROJECT_NAME}/utility/json.cpp
+  src/${PROJECT_NAME}/metadata/tags.cpp
 )#!END: SOURCE LIST
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources}) # for properly displying directory structure in IDEs

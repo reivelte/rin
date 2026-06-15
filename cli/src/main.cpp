@@ -11,6 +11,7 @@
 #include <suzuri/utility/hash.hpp>
 #include <suzuri/utility/json.hpp>
 #include <suzuri/utility/string.hpp>
+#include <suzuri/utility/domain.hpp>
 #include "args.hpp"
 #include "config.hpp"
 
@@ -282,21 +283,48 @@ int main(int argc, char** argv)
         exit_code = sz::result_code::Success;
     }
     else
-    {
-        sz::result<nlohmann::json> config_json = rin::get_default_config();
-        
-        if (!config_json)
-        { return sz::check_error(config_json); }
-        
-        rin::program_configuration conf = rin::read_config(*config_json);
+    {        
+        sz::toml_config conf;
         if (args.config_path)
-        { conf = rin::read_config(sz::utility::json_from_file(*args.config_path)); }
+        {
+            auto ret = sz::toml_config::create_or_open(*args.config_path, sz::config_type::Static);
+            if (ret)
+            { conf = *ret; }
+            else
+            { return sz::check_error(ret); }
+        }
+        else
+        {
+            auto ret = rin::get_default_config();
+            if (ret)
+            { conf = *ret; }
+            else
+            { return sz::check_error(ret); }
+        }
 
-        std::filesystem::path database_path = args.database_path.value_or(conf.database_path.string());
-        
+        const auto conf_default_domain_path = conf.value<std::string>("default_domain");
+        std::filesystem::path domain_path = args.domain_path.value_or(conf_default_domain_path);
+
+        if (!std::filesystem::exists(domain_path))
+        {
+            if (domain_path.empty())
+            {
+                domain_path = sz::utility::default_domain_path() / "default";
+            }
+
+            const auto domain_path_ = domain_path.string();
+            
+            if (conf_default_domain_path.empty())
+            { conf.set_value("default_domain", domain_path_); }
+            
+            std::println("The domain at {} does not exist. Will attempt to create it.", domain_path_);
+
+            if (!sz::utility::create_domain(domain_path))
+            { return std::to_underlying(sz::result_code::Init_Problem); }
+        }
         try 
-        { 
-            sz::entity_database db(database_path); 
+        {
+            sz::entity_database db(sz::utility::database_path_from_domain_path(domain_path));
             if (args.tag_cmd.is_valid)
             {
                 exit_code = rin::tag_input(args.tag_cmd, db, args.verbose);

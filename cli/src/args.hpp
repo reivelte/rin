@@ -76,7 +76,7 @@ namespace rin::argument_definitions
         bool& version = flag("version", "Print the version and exit.");
         bool& verbose = flag("v,verbose", "Print additional messages related to the current action taking place.");
         std::optional<std::string>& config_path = kwarg("c,config", "Path to config file. If this is omitted then the usual directories are searched for a config file.");
-        std::optional<std::string>& database_path     = kwarg("l,library", "Path to the library database file. Overrides the value for 'default_library' in the config.");
+        std::optional<std::string>& domain_path     = kwarg("d,domain", "Path to a domain folder. Overrides the value for 'default_domain' in the config.");
 
         void welcome() override { std::print("Reflexive Indexer. Index files, directories, and user-defined objects using additional metadata."); }
     };

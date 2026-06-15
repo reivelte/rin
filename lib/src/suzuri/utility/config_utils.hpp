@@ -9,8 +9,9 @@
 #include <tuple>
 #include <toml.hpp>
 #include <sz_export.hpp>
-#include "string.hpp"
+#include "../result.hpp"
 #include "../basic_vectors.hpp"
+#include "string.hpp"
 
 namespace sz
 {
@@ -31,6 +32,8 @@ namespace sz
     class SZ_API toml_config
     {
         public:
+        static sz::result<toml_config> create_or_open(const std::filesystem::path& p, config_type t);
+
         toml_config() = default;
         toml_config(const std::filesystem::path& p, config_type t);
         ~toml_config() = default;
@@ -41,7 +44,9 @@ namespace sz
         template <typename T>
         T value(std::string key);
 
-        inline void set_config(const std::filesystem::path& p, config_type t);
+        bool has_value(std::string key);
+        sz::result<void> set_config(const std::filesystem::path& p, config_type t);
+
         void set_window_size(int w, int h);
         void set_recently_used_domain(const std::filesystem::path& path);
         void add_domain_location(const std::filesystem::path& path);
@@ -58,6 +63,8 @@ namespace sz
         bool m_keys_exist(const std::vector<std::string>& keys, toml::ordered_value& data);
         toml::ordered_value& m_data_for_keys(const std::vector<std::string>& keys, toml::ordered_value& data);
         
+        sz::result<toml::ordered_value> m_init();
+        sz::result<toml::ordered_value> m_read() const;
         void m_write(auto& data);
 
         private:
@@ -65,16 +72,15 @@ namespace sz
         config_type m_type;
     };
 
-    inline void toml_config::set_config(const std::filesystem::path& p, config_type t)
-    {
-        m_filepath = p;
-        m_type = t;
-    }
-
-    // TODO: check writable and readable
     inline bool toml_config::available() const
     {
-        return std::filesystem::exists(m_filepath);
+        if (!std::filesystem::exists(m_filepath))
+        { return false; }
+        
+        if (auto data = m_read(); !data)
+        { return false; }
+
+        return true;
     }
 
     // assumes key contains either zero or one subkey(s)
