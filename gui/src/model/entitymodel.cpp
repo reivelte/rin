@@ -124,6 +124,9 @@ namespace rin
     // root queries with no preexisting item entry have a -1 row value in the returned index
     QModelIndex entity_model::query(const QString& text)
     {
+        if (text.isEmpty())
+        { return QModelIndex(); }
+        
         if (m_root)
         { m_deactivate(*m_root); }
 
@@ -313,7 +316,12 @@ namespace rin
         emit need_thumbnails(jobs);
     }
 
-    bool entity_model::extended_information_loaded(const QModelIndex& index) const
+    bool entity_model::valid_index(const QModelIndex& index)
+    {
+        return m_valid_index(index);
+    }
+
+    bool entity_model::extended_information_loaded(const QModelIndex &index) const
     {
         using enum entity_attribute_type;
         using enum sz::entity_type;

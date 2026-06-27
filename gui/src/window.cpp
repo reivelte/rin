@@ -501,11 +501,13 @@ namespace rin
 
     void main_window::m_query(const QString& text)
     {
-        const QModelIndex root = m_model->query(text);
-        m_lineedit->setText(m_model->root_query());
-        m_view->setRootIndex(root);
-        m_set_window_title();
-        m_update_view_stats({});
+        if (const QModelIndex root = m_model->query(text); m_model->valid_index(root))
+        {
+            m_lineedit->setText(m_model->root_query());
+            m_view->setRootIndex(root);
+            m_set_window_title();
+            m_update_view_stats({});
+        }
     }
 
     void main_window::m_set_window_title()

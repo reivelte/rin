@@ -82,7 +82,8 @@ namespace rin
         
         void clear_thumbnails();
         void request_thumbnails(const std::vector<QModelIndex>& indexes, const std::vector<QSize>& sizes);
-        
+
+        bool valid_index(const QModelIndex& index);
         bool extended_information_loaded(const QModelIndex& index) const;
         QPixmap thumbnail(const QModelIndex& index) const;
         QPixmap thumbnail(const reflexive_entity& e) const;
