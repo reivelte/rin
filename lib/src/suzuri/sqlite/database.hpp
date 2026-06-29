@@ -71,16 +71,19 @@ namespace sz::sqlite
         if (auto status = it->second.status(); !(status == OK || status == Row || status == Done))
         { return it->second; }
 
-        if constexpr (N == 1 && is_vector<std::tuple_element_t<0, std::tuple<Binds...>>>)
+        if constexpr (N == 1)
         {
-            using VectorType = typename std::decay_t<decltype((std::forward<Binds>(binds), ...))>::value_type;
-            static_assert(is_bindable<VectorType>, "Array of values must all be bindable or of sqlite::variant type");
-            const std::vector<VectorType>& vec = std::get<0>(std::tuple<Binds...>(std::forward<Binds>(binds)...));
-            if (!it->second.has_same_binds(vec))
+            if constexpr (is_vector<std::tuple_element_t<0, std::tuple<Binds...>>>)
             {
-                it->second.reset_all();
-                m_make_binds(it->second, vec);
-                it->second.size(); // get the size so vector allocations made in query.rows/xrows() are efficient
+                using VectorType = typename std::decay_t<decltype((std::forward<Binds>(binds), ...))>::value_type;
+                static_assert(is_bindable<VectorType>, "Array of values must all be bindable or of sqlite::variant type");
+                const std::vector<VectorType>& vec = std::get<0>(std::tuple<Binds...>(std::forward<Binds>(binds)...));
+                if (!it->second.has_same_binds(vec))
+                {
+                    it->second.reset_all();
+                    m_make_binds(it->second, vec);
+                    it->second.size(); // get the size so vector allocations made in query.rows/xrows() are efficient
+                }
             }
         }
         else 
@@ -103,12 +106,15 @@ namespace sz::sqlite
     [[nodiscard]] inline database_query database::make_query(std::string_view sql, Binds&&... binds)
     {
         database_query q(m_handle, sql);
-        if constexpr (N == 1 && is_vector<std::tuple_element_t<0, std::tuple<Binds...>>>)
+        if constexpr (N == 1)
         {
-            using VectorType = typename std::decay_t<decltype((std::forward<Binds>(binds), ...))>::value_type;
-            static_assert(is_bindable<VectorType>, "Array of values must all be bindable or of sqlite::variant type");
-            const std::vector<VectorType>& vec = std::get<0>(std::tuple<Binds...>(std::forward<Binds>(binds)...));
-            m_make_binds(q, vec);
+            if constexpr (is_vector<std::tuple_element_t<0, std::tuple<Binds...>>>)
+            {
+                using VectorType = typename std::decay_t<decltype((std::forward<Binds>(binds), ...))>::value_type;
+                static_assert(is_bindable<VectorType>, "Array of values must all be bindable or of sqlite::variant type");
+                const std::vector<VectorType>& vec = std::get<0>(std::tuple<Binds...>(std::forward<Binds>(binds)...));
+                m_make_binds(q, vec);
+            }
         }
         else
         { m_make_binds(q, std::forward<Binds>(binds)...); }
