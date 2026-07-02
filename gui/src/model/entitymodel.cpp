@@ -1271,13 +1271,12 @@ namespace rin
         m_root = std::nullopt;
     }
 
-    // cancels any pending queries for the node pointed to by key and unwatches its path if it is a filesystem directory
+    // unwatches the path represented by key if it is a filesystem directory and stops any delayed queries associated with key
     inline void entity_model::m_deactivate(int key)
     {
         if (m_tree.contains(key))
         {
             const auto& qd = m_node_for_key(key).descriptor;
-            m_dataman->cancel_query(qd);
             m_dataman->unwatch_path(qd.text);
             m_remove_delayed_info_fetch(key);
             m_delayed_sort_timer.stop();
