@@ -210,6 +210,9 @@ namespace rin
 
     entity_view_layout_descriptor entity_view::list_mode::prepare_item_layout() 
     {
+        if (model_is_entity_model && !entity_model_ptr()->valid_index(root_index))
+        { return entity_view_layout_descriptor(); }
+        
         if (nodes.empty())
         {
             create_node(root_index, list_mode_tree_node::node_state::Expanded, 0);

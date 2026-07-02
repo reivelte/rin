@@ -947,6 +947,9 @@ namespace rin
             {
                 if (lv->nodes.empty())
                 {
+                    if (m->model_is_entity_model && !m->entity_model_ptr()->valid_index(m->root_index))
+                    { return; }
+                    
                     qDebug() << "entity_view: nodes was empty, regenerating root";
                     lv->create_node(m->root_index, Expanded, 0);
                     // it is assumed the bsp hasn't been created yet. it will be created in prepare_item_layout()
