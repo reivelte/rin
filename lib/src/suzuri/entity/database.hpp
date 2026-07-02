@@ -105,6 +105,7 @@ namespace sz
         
         /* get and set tags for an entity or entities */
         int tag(const std::filesystem::path& file_path, const std::vector<std::string>& tags, std::string_view description_for_file = "", int rgba = 255, bool dont_use_aliases = false, bool skip_nonexistent_tags = false);
+        sqlite::database_query tags();
         sqlite::database_query tags(const entity_database_query& query);
         std::vector<std::string> tags(const std::filesystem::path& path);
         std::unordered_map<std::string, int> tags(const entity_database_query& query, int n);

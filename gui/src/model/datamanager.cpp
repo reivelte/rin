@@ -579,6 +579,10 @@ namespace rin
                 .string = short_text.toStdString().substr(s_query_cmd_tagsof.size())
             }));
         }
+        else if (short_text.startsWith(s_query_cmd_taglist.data(), Qt::CaseInsensitive)) // indexed
+        {
+            return entity_data_manager::data_source(m_database.tags());
+        }
         
         return entity_data_manager::data_source(m_database.files(sz::entity_database_query{
             .string = short_text.toStdString()

@@ -29,6 +29,7 @@ namespace rin
     namespace detail
     {
         static constexpr std::string_view s_query_cmd_tagsof = "!tagsof:";
+        static constexpr std::string_view s_query_cmd_taglist = "!taglist:";
 
         template <typename T>
         struct deduce_from {};

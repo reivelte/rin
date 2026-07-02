@@ -509,6 +509,11 @@ namespace sz
         return tags_applied;
     }
 
+    sqlite::database_query entity_database::tags()
+    {
+        return m_db.make_query("SELECT DISTINCT outset FROM link");
+    }
+
     sqlite::database_query entity_database::tags(const entity_database_query& query)
     {
         bool file_query = std::filesystem::exists(query.string);
