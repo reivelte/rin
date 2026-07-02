@@ -99,7 +99,9 @@ namespace rin
         void clear_node(const QModelIndex& index);
         void collapse_node(const QModelIndex& index);
         int content_height_for_node(const QModelIndex& index) const;
+        int content_width_for_node(const QModelIndex& index) const;
         void recalculate_content_height(); // used when icon size is changed
+        void recalculate_content_width();
         std::tuple<int, int> intersecting_range(const QRect& r) const;
         
         /* templates */
@@ -221,7 +223,7 @@ namespace rin
         {
             expand_node(root_index);
         }
-        
+
         if (!bsp.initialized())
         { create_bsp(); }
 
@@ -229,6 +231,8 @@ namespace rin
         {
             autoexpand_child_nodes(root_index);
         }
+
+        recalculate_content_width();
 
         const auto [start, end] = intersecting_range(bounds);
         return entity_view_layout_descriptor{
@@ -300,7 +304,7 @@ namespace rin
         const QRect prev_rect = opt.rect;
         
         opt.state &= ~QStyle::State_Selected;
-        opt.rect.setWidth(view->viewport()->rect().width());
+        opt.rect.setWidth(std::max(view->viewport()->width(), total_content_width));
         opt.rect.setLeft(0);
 
         painter.drawPrimitive(QStyle::PE_PanelItemViewRow, opt);
@@ -583,9 +587,37 @@ namespace rin
         return total_h;
     }
 
+    // assumes index occurs in tree
+    int entity_view::list_mode::content_width_for_node(const QModelIndex& index) const
+    {
+        int w = 0;
+        if (header)
+        {
+            const int c = model->columnCount(index);
+            for (int i = 0; i < c; ++i) // col count is expected to be the same for every node
+            {
+                if (i < c - 1)
+                { w += header->sectionSize(i); }
+                else
+                { w += view->sizeHintForColumn(i); } // last column is stretched, so get the size of its contents instead
+            }
+        }
+        else
+        {
+            // we assume active_column is the only visible column
+            w = view->sizeHintForColumn(active_column);
+        }
+        return w;
+    }
+
     void entity_view::list_mode::recalculate_content_height()
     {
         total_content_height = content_height_for_node(root_index);
+    }
+
+    void entity_view::list_mode::recalculate_content_width()
+    {
+        total_content_width = content_width_for_node(root_index);
     }
 
     std::tuple<int, int> entity_view::list_mode::intersecting_range(const QRect& r) const

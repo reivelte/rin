@@ -47,7 +47,6 @@ namespace rin
         QBasicTimer delayed_repaint_timer;
         QRect elasticband;
         QRect bounds;
-        QSize content_size;
         QSize icon_mode_icon_size;
         QSize list_mode_icon_size;
         QSize item_max_thumbnail_size;
@@ -60,6 +59,7 @@ namespace rin
         qreal item_aspect_ratio;
         int view_loaded_items; // an item is considered to be loaded if we have a size for it and a row to place it in
         int total_content_height;
+        int total_content_width;
         int layout_batch_size;
         int item_default_text_width;
         int item_single_line_text_height;
@@ -97,7 +97,7 @@ namespace rin
         
         /* may or may not be overridden */
         virtual void clear();
-        virtual void update_vertical_scrollbar(const QSize& step);
+        virtual void update_scrollbars(const QSize& step);
         virtual void scroll_contents_by(int dx, int dy, bool scroll_elastic_band);
         virtual int horizontal_offset() const;
         virtual int vertical_offset() const;
@@ -153,33 +153,44 @@ namespace rin
     {
         set_hover_index(QModelIndex());
         interrupt_delayed_item_layout();
-        content_size = QSize();
         view_loaded_items = 0;
         total_content_height = row_spacing_y;
+        total_content_width = 0;
         applied_layouts.clear();
         pending_layouts.clear();
         pending_layout_timer.stop();
     }
 
-    void entity_view::impl::update_vertical_scrollbar(const QSize& step) 
+    void entity_view::impl::update_scrollbars(const QSize& step) 
     {
         const bool both_scrollbars_auto = (view->verticalScrollBarPolicy() == Qt::ScrollBarAsNeeded) && (view->horizontalScrollBarPolicy() == Qt::ScrollBarAsNeeded);
-        QSize size_of_viewport = view->viewport()->size();
-        QSize size_of_contents = content_size;
+        const QSize size_of_viewport = view->viewport()->size();
 
-        bool vbar_will_show = size_of_contents.height() > size_of_viewport.height();
-        bool hbar_will_show = false;
+        bool vbar_will_show = total_content_height > size_of_viewport.height();
+        bool hbar_will_show = total_content_width > size_of_viewport.width();
 
-        view->verticalScrollBar()->setSingleStep(step.height() / 4);
-        view->verticalScrollBar()->setPageStep(size_of_viewport.height());
+        auto* vbar = view->verticalScrollBar();
+        auto* hbar = view->horizontalScrollBar();
+        vbar->setSingleStep(step.height() / 4);
+        vbar->setPageStep(size_of_viewport.height());
+        hbar->setSingleStep(step.width() / 4);
+        hbar->setPageStep(size_of_viewport.width());
 
         if (hbar_will_show)
-        { vbar_will_show = size_of_contents.height() > size_of_viewport.height() - view->horizontalScrollBar()->height(); }
+        { vbar_will_show = total_content_height > size_of_viewport.height() - hbar->height(); }
+
+        if (vbar_will_show)
+        { hbar_will_show = total_content_width > size_of_viewport.width() - vbar->width(); }
         
         if (both_scrollbars_auto && !vbar_will_show)
-        { view->verticalScrollBar()->setRange(0, 0); } // workaround QTBUG-39902 (see qlistview.cpp line 2037)
+        { vbar->setRange(0, 0); } // workaround QTBUG-39902 (see qlistview.cpp line 2037)
         else
-        { view->verticalScrollBar()->setRange(0, (size_of_contents.height() - size_of_viewport.height())); }
+        { vbar->setRange(0, (total_content_height - size_of_viewport.height())); }
+
+        if (both_scrollbars_auto && !hbar_will_show)
+        { hbar->setRange(0, 0); }
+        else
+        { hbar->setRange(0, total_content_width - size_of_viewport.width()); }
     }
 
     void entity_view::impl::scroll_contents_by(int dx, int dy, bool scroll_elastic_band)
@@ -393,7 +404,7 @@ namespace rin
     }
 
     inline int entity_view::impl::flip_x(int x) const
-    { return std::max(view->viewport()->width(), content_size.width()) - x; }
+    { return std::max(view->viewport()->width(), total_content_width) - x; }
 
     inline QPoint entity_view::impl::flip_x(const QPoint& p) const
     { return QPoint(flip_x(p.x()), p.y()); }

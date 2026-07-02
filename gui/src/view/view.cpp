@@ -110,6 +110,7 @@ namespace rin
             auto* lv = m->as<list_mode*>();
             lv->clear_layout_data();
             lv->recalculate_content_height();
+            lv->recalculate_content_width();
         }
         else
         { m->clear(); }
@@ -360,13 +361,13 @@ namespace rin
         clearSelection();
         m->active_column = 0;
         m->root_index = index;
+        QAbstractItemView::setRootIndex(index); // will schedule a layout and updateGeometry()
         if (viewmode() == entity_view_mode::List)
         {
             auto* lv = m->as<list_mode*>();
             if (lv->header)
             { lv->header->setRootIndex(index); }
         }
-        QAbstractItemView::setRootIndex(index); // will schedule a layout and updateGeometry()
     }
 
     void entity_view::selectAll()
@@ -398,7 +399,7 @@ namespace rin
                 height = std::min(height, lv->header->maximumHeight());
                 setViewportMargins(0, height, 0, 0);
                 const QRect vg = viewport()->geometry();
-                const QRect hg(vg.left(), vg.top() - height, vg.width(), height);
+                const QRect hg(vg.left() - m->horizontal_offset(), vg.top() - height, std::max(m->total_content_width, vg.width()), height);
                 lv->header->setGeometry(hg);
                 QMetaObject::invokeMethod(lv->header, "updateGeometries");
             }
@@ -416,8 +417,7 @@ namespace rin
         }
         else
         {
-            m->content_size = QSize(viewport()->rect().size().width(), m->total_content_height);
-            m->update_vertical_scrollbar(QSize(m->item_max_width, m->item_max_height));
+            m->update_scrollbars(QSize(m->item_max_width, m->item_max_height));
         }
         m->block_geometry_updates = false;
         updateEditorGeometries();
