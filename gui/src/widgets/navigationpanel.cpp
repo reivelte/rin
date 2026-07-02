@@ -65,7 +65,7 @@ namespace rin
 
     QSize navigation_panel::sizeHint() const
     {
-        return QSize(m_panel_width, parentWidget()->height());
+        return QSize(m_panel_width, height());
     }
 
     void navigation_panel::set_width(int w)

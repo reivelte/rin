@@ -16,6 +16,7 @@
 #include <QtWidgets/QMenuBar>
 #include <QtWidgets/QFileDialog>
 #include <QtWidgets/QMessageBox>
+#include <QtWidgets/QSplitter>
 #include <QtGui/QDesktopServices>
 #include <QtGui/QImageReader>
 #include <QtGui/QFileSystemModel>
@@ -23,6 +24,7 @@
 #include "window.hpp"
 #include "view/view.hpp"
 #include "widgets/navigationpanel.hpp"
+#include "widgets/tag_listing.hpp"
 #include "widgets/iconsizer.hpp"
 #include "widgets/dialogs/domain.hpp"
 
@@ -114,7 +116,8 @@ namespace rin
         m_location_bar->setMovable(false);
         m_location_bar->addWidget(m_lineedit);
         addToolBar(Qt::ToolBarArea::TopToolBarArea, m_location_bar);
-        
+
+        // ------- begin navigation toolbar setup
         m_navpanel = new navigation_panel(this);
         if (auto targets = m_main_config->value<std::vector<std::string>>("navigation_panel.targets"); targets.size())
         {
@@ -123,11 +126,19 @@ namespace rin
                 m_navpanel->add_target(QFileInfo(QString::fromStdString(path)));
             }
         }
+
+        m_tag_listing = new tag_listing(this, m_model, tag_listing::viewmode::Oneline);
+
+        m_nav_splitter = new QSplitter(Qt::Orientation::Vertical);
+        m_nav_splitter->addWidget(m_navpanel);
+        m_nav_splitter->addWidget(m_tag_listing);
         
         m_nav_bar = new QToolBar("Navigation", this);
         m_nav_bar->setAllowedAreas(Qt::ToolBarArea::LeftToolBarArea | Qt::ToolBarArea::RightToolBarArea);
-        m_nav_bar->addWidget(m_navpanel);
+        m_nav_bar->addWidget(m_nav_splitter);
         addToolBar(Qt::ToolBarArea::LeftToolBarArea, m_nav_bar);
+
+        // ------- end navigation panel setup
 
         m_details_panel = new details_panel(this, m_model);
         

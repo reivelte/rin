@@ -22,12 +22,14 @@ class QToolButton;
 class QContextMenuEvent;
 class QMenu;
 class QAction;
+class QSplitter;
 QT_END_NAMESPACE
 
 namespace rin
 {
     class entity_view;
     class navigation_panel;
+    class tag_listing;
     class icon_sizer;
     class domain_dialog;
     class main_window : public QMainWindow
@@ -110,7 +112,11 @@ namespace rin
         std::shared_ptr<sz::toml_config> m_state_config;
         std::shared_ptr<sz::toml_config> m_main_config;
         std::filesystem::path m_database_path;
+        
+        QSplitter* m_nav_splitter;
+        tag_listing* m_tag_listing;
         QToolBar* m_nav_bar;
+
         QToolBar* m_details_bar;
         navigation_panel* m_navpanel;
         details_panel* m_details_panel;

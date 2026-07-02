@@ -6,14 +6,16 @@
 #include <QtGui/QPaintEvent>
 #include <QtGui/QPainter>
 #include <QtGui/QTextOption>
+#include "model/entitymodel.hpp"
+#include "view/view.hpp"
 #include "tag_listing.hpp"
 
 namespace rin
 {
-    tag_listing::tag_listing(QWidget* parent) :
-        QFrame(parent), m_xpad(10), m_ypad(10)
+    tag_listing::tag_listing(QWidget* parent, entity_model* model, tag_listing::viewmode mode) :
+        QFrame(parent), m_view(nullptr), m_model(model), m_mode(tag_listing::viewmode::Null), m_xpad(10), m_ypad(10)
     {
-
+        set_viewmode(mode);
     }
 
     tag_listing::~tag_listing()
@@ -27,7 +29,16 @@ namespace rin
         update();
     }
 
-    void tag_listing::set_tags(const std::vector<reflexive_entity> &tags)
+    void tag_listing::set_viewmode(tag_listing::viewmode mode)
+    {
+        if (mode == m_mode)
+        { return; }
+
+        m_create_view(mode);
+        m_mode = mode;
+    }
+
+    void tag_listing::set_tags(const std::vector<reflexive_entity>& tags)
     {
         m_tags = tags;
         m_layout_items();
@@ -53,24 +64,36 @@ namespace rin
         return m_tags;
     }
 
+    void tag_listing::resizeEvent(QResizeEvent* event)
+    {
+        QFrame::resizeEvent(event);
+        if (m_view)
+        {
+            m_view->resize(event->size());
+        }
+    }
+
     // TODO: visual indicator that a given tag already exists in the db
     void tag_listing::paintEvent(QPaintEvent* event)
     {
         QFrame::paintEvent(event);
-        QPainter painter(this);
-        QTextOption text_opt;
-        text_opt.setWrapMode(QTextOption::WrapMode::WrapAnywhere);
-        text_opt.setTextDirection(Qt::LayoutDirection::LeftToRight);
-        text_opt.setAlignment(QStyle::visualAlignment(Qt::LayoutDirection::LeftToRight, Qt::AlignmentFlag::AlignVCenter | Qt::AlignmentFlag::AlignHCenter));
-
-        int i = 0;
-        for (const auto& tag : m_tags)
+        if (m_mode == Block)
         {
-            const auto text = tag.attribute<QString>(Name);
-            const QRect text_rect = m_layout[i];
-            painter.drawRect(text_rect);
-            painter.drawText(text_rect, text, text_opt);
-            ++i;
+            QPainter painter(this);
+            QTextOption text_opt;
+            text_opt.setWrapMode(QTextOption::WrapMode::WrapAnywhere);
+            text_opt.setTextDirection(Qt::LayoutDirection::LeftToRight);
+            text_opt.setAlignment(QStyle::visualAlignment(Qt::LayoutDirection::LeftToRight, Qt::AlignmentFlag::AlignVCenter | Qt::AlignmentFlag::AlignHCenter));
+
+            int i = 0;
+            for (const auto& tag : m_tags)
+            {
+                const auto text = tag.attribute<QString>(Name);
+                const QRect text_rect = m_layout[i];
+                painter.drawRect(text_rect);
+                painter.drawText(text_rect, text, text_opt);
+                ++i;
+            }
         }
     }
 
@@ -90,23 +113,54 @@ namespace rin
         }
     }
 
+    void tag_listing::m_create_view(tag_listing::viewmode mode)
+    {
+        if (m_view)
+        { delete m_view; }
+
+        if (mode == Oneline)
+        {
+            m_view = new entity_view(this);
+            m_view->set_viewmode(entity_view_mode::List);
+            m_view->set_header_enabled(false);
+            m_view->resize(width(), height());
+            m_view->setModel(m_model);
+            m_default_populate_view();
+        }
+        else if (mode == Block)
+        {
+            // TODO
+        }
+    }
+
+    void tag_listing::m_default_populate_view()
+    {
+        if (m_view && m_model)
+        {
+            m_view->setRootIndex(m_model->query("!taglist:"));
+        }
+    }
+
     // TODO: scrolling when amount of tags overflows available space on the widget
     void tag_listing::m_layout_items()
     {
-        m_layout.clear();
-        const auto r = rect();
-        auto metrics = fontMetrics();
-        QPoint pos(r.topLeft() + QPoint(m_xpad, m_ypad));
-        for (const auto& tag : m_tags)
+        if (m_mode == Block)
         {
-            const auto text = tag.attribute<QString>(Name);
-            m_layout.emplace_back(pos, QSize(metrics.horizontalAdvance(text) + m_xpad, metrics.height() + m_ypad / 2));
-            const auto& text_rect = m_layout.back();
-            pos.rx() += text_rect.width();
-            if (pos.x() >= r.right())
+            m_layout.clear();
+            const auto r = rect();
+            auto metrics = fontMetrics();
+            QPoint pos(r.topLeft() + QPoint(m_xpad, m_ypad));
+            for (const auto& tag : m_tags)
             {
-                pos.setX(m_xpad);
-                pos.setY(pos.y() + metrics.height() + m_ypad);
+                const auto text = tag.attribute<QString>(Name);
+                m_layout.emplace_back(pos, QSize(metrics.horizontalAdvance(text) + m_xpad, metrics.height() + m_ypad / 2));
+                const auto& text_rect = m_layout.back();
+                pos.rx() += text_rect.width();
+                if (pos.x() >= r.right())
+                {
+                    pos.setX(m_xpad);
+                    pos.setY(pos.y() + metrics.height() + m_ypad);
+                }
             }
         }
     }

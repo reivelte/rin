@@ -12,7 +12,7 @@ namespace rin
         ui_panel(parent),
         m_model(model), m_lineedit(nullptr), m_vbox(nullptr)
     {
-        m_tag_list = new tag_listing(this);
+        m_tag_list = new tag_listing(this, model, tag_listing::viewmode::Block);
         m_lineedit = new QLineEdit(this);
 
         m_vbox = new QVBoxLayout(this);
