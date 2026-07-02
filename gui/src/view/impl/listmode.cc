@@ -255,8 +255,8 @@ namespace rin
 
         if (const auto [start_parent, lpos] = item_at_global_position(gpos); nodes.contains(start_parent))
         {
-            const int x_start = header->sectionPosition(0);
-            const int w = header->sectionSize(0);
+            const int x_start = header ? header->sectionPosition(0) : 0;
+            const int w = header ? header->sectionSize(0) : default_item_rect_width();
             const int h = default_item_rect_height();
             traverse_tree([&](const QModelIndex& parent, entity_view_item& item, int item_loc) -> bool
             {
@@ -323,11 +323,14 @@ namespace rin
         );
 
         painter.drawPrimitive(QStyle::PE_IndicatorBranch, branch_opt);
-        draw_row(&painter, index);
-        painter.setClipRect(QRect(
-            QPoint(header->sectionPosition(0), opt.rect.top()),
-            QSize(header->sectionSize(0), opt.rect.height())
-        ));
+        if (header)
+        {
+            draw_row(&painter, index);
+            painter.setClipRect(QRect(
+                QPoint(header->sectionPosition(0), opt.rect.top()),
+                QSize(header->sectionSize(0), opt.rect.height())
+            ));
+        }
     }
 
     // autoexpand_nodes is not cleared here
@@ -791,6 +794,9 @@ namespace rin
         if (index.column() == active_column)
         { return rect_for_model_index(index); }
 
+        if (!header)
+        { return QRect(); }
+
         const int y = nodes[index.parent()].items[index.row()].y();
         const int col = index.column();
         return QRect(
@@ -821,8 +827,8 @@ namespace rin
             const QModelIndex idx = model->index(index.row(), col, index.parent());
             if (const QString text = model->data(idx, Qt::DisplayRole).toString(); text.size())
             {
-                const QRect col_rect = map_to_viewport(rect_for_auxiliary_item(idx));
-                painter->drawText(col_rect, font.elidedText(text, Qt::TextElideMode::ElideRight, col_rect.width()), textopt);
+                if (const QRect col_rect = map_to_viewport(rect_for_auxiliary_item(idx)); col_rect.isValid())
+                { painter->drawText(col_rect, font.elidedText(text, Qt::TextElideMode::ElideRight, col_rect.width()), textopt); }
             }
         }
         painter->restore();

@@ -118,6 +118,23 @@ namespace rin
         { m->entity_model_ptr()->clear_thumbnails(); }
     }
 
+    void entity_view::set_header_enabled(bool enabled)
+    {
+        if (viewmode() == entity_view_mode::List)
+        {
+            auto* lv = m->as<list_mode*>();
+            if (lv->header)
+            {
+                delete lv->header;
+                lv->header = nullptr;
+            }
+            
+            if (enabled)
+            { lv->set_header(new QHeaderView(Qt::Horizontal, this)); }
+            update();
+        }
+    }
+
     entity_view_mode entity_view::viewmode() const
     {
         return m->current_viewmode;
@@ -177,10 +194,13 @@ namespace rin
         if (viewmode() == entity_view_mode::List)
         {
             auto* lv = m->as<list_mode*>();
-            m->block_geometry_updates = true;
-            lv->header->setModel(m->model);
-            m->block_geometry_updates = false;
-            sort_by_column(lv->header->sortIndicatorSection(), lv->header->sortIndicatorOrder());
+            if (lv->header)
+            {
+                m->block_geometry_updates = true;
+                lv->header->setModel(m->model);
+                m->block_geometry_updates = false;
+                sort_by_column(lv->header->sortIndicatorSection(), lv->header->sortIndicatorOrder());
+            }
         }
 
         if (m->model_is_entity_model)
@@ -233,7 +253,8 @@ namespace rin
         if (viewmode() == entity_view_mode::List)
         {
             auto* lv = m->as<list_mode*>();
-            lv->header->setSelectionModel(model);
+            if (lv->header)
+            { lv->header->setSelectionModel(model); }
         }
     }
 
@@ -316,9 +337,12 @@ namespace rin
         if (viewmode() == entity_view_mode::List)
         {
             auto* lv = m->as<list_mode*>();
-            lv->header->setSortIndicator(column, order);
+            if (lv->header)
+            {
+                lv->header->setSortIndicator(column, order);
+                emit sort_indicator_changed(column, order);
+            }
         }
-        emit sort_indicator_changed(column, order);
         m->model->sort(column, order);
     }
 
@@ -339,7 +363,8 @@ namespace rin
         if (viewmode() == entity_view_mode::List)
         {
             auto* lv = m->as<list_mode*>();
-            lv->header->setRootIndex(index);
+            if (lv->header)
+            { lv->header->setRootIndex(index); }
         }
         QAbstractItemView::setRootIndex(index); // will schedule a layout and updateGeometry()
     }
@@ -949,7 +974,7 @@ namespace rin
                 {
                     if (m->model_is_entity_model && !m->entity_model_ptr()->valid_index(m->root_index))
                     { return; }
-                    
+
                     qDebug() << "entity_view: nodes was empty, regenerating root";
                     lv->create_node(m->root_index, Expanded, 0);
                     // it is assumed the bsp hasn't been created yet. it will be created in prepare_item_layout()

@@ -22,6 +22,7 @@ namespace rin
 
         void set_viewmode(entity_view_mode mode);
         void set_iconsize(const QSize& size);
+        void set_header_enabled(bool enabled);
         
         entity_view_mode viewmode() const;
         QList<QModelIndex> selected_indexes() const;
