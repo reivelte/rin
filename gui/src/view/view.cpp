@@ -119,6 +119,12 @@ namespace rin
         { m->entity_model_ptr()->clear_thumbnails(); }
     }
 
+    void entity_view::set_item_alignment(entity_view_item_visual_align align)
+    {
+        m->item_alignment_in_row = align;
+        scheduleDelayedItemsLayout();
+    }
+
     void entity_view::set_header_enabled(bool enabled)
     {
         if (viewmode() == entity_view_mode::List)
@@ -163,12 +169,6 @@ namespace rin
             indexes << m->root_index;
         }
         return indexes;
-    }
-
-    void entity_view::set_item_alignment(entity_view_item_visual_align align)
-    {
-        m->item_alignment_in_row = align;
-        scheduleDelayedItemsLayout();
     }
 
     void entity_view::setModel(QAbstractItemModel* model)

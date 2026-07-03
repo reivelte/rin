@@ -22,13 +22,12 @@ namespace rin
 
         void set_viewmode(entity_view_mode mode);
         void set_iconsize(const QSize& size);
+        void set_item_alignment(entity_view_item_visual_align align);
         void set_header_enabled(bool enabled);
         
         entity_view_mode viewmode() const;
         QList<QModelIndex> selected_indexes() const;
         QList<QModelIndex> expanded_indexes() const;
-
-        void set_item_alignment(entity_view_item_visual_align align);
 
         //reimplemented public functions
         void setModel(QAbstractItemModel* model) override;
