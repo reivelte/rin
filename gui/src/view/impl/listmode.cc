@@ -140,7 +140,7 @@ namespace rin
     };
 
     entity_view::list_mode::list_mode(entity_view* parent)
-    : entity_view::impl(parent), header(nullptr), x_indent_scale(40)
+    : entity_view::impl(parent), header(nullptr)
     {
         init();
         set_header(new QHeaderView(Qt::Horizontal, view));
@@ -156,6 +156,7 @@ namespace rin
 
     void entity_view::list_mode::init()
     {
+        x_indent_scale = 40;
         visible_items = 0;
         current_viewmode = entity_view_mode::List;
         elasticband = QRect();
@@ -260,7 +261,7 @@ namespace rin
         if (const auto [start_parent, lpos] = item_at_global_position(gpos); nodes.contains(start_parent))
         {
             const int x_start = header ? header->sectionPosition(0) : 0;
-            const int w = header ? header->sectionSize(0) : default_item_rect_width();
+            const int w = header ? header->sectionSize(0) : view->sizeHintForColumn(0);
             const int h = default_item_rect_height();
             traverse_tree([&](const QModelIndex& parent, entity_view_item& item, int item_loc) -> bool
             {
@@ -965,7 +966,12 @@ namespace rin
 
     inline int entity_view::list_mode::default_item_rect_height() const
     {
-        return item_max_thumbnail_size.height() + padding_y + row_spacing_y;
+        const int space = padding_y + row_spacing_y;
+        
+        if (item_max_thumbnail_size.isEmpty()) // if thumbnails are disabled
+        { return view->fontMetrics().height() + space; }
+
+        return item_max_thumbnail_size.height() + space;
     }
 
     inline QSize entity_view::list_mode::approximate_content_size(size_t item_count) const

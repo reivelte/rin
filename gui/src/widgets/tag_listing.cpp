@@ -123,6 +123,8 @@ namespace rin
             m_view = new entity_view(this);
             m_view->set_viewmode(entity_view_mode::List);
             m_view->set_header_enabled(false);
+            m_view->set_indent(0);
+            m_view->set_iconsize(QSize(0, 0));
             m_view->resize(width(), height());
             m_view->setModel(m_model);
             m_default_populate_view();

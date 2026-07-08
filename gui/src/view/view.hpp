@@ -24,6 +24,7 @@ namespace rin
         void set_iconsize(const QSize& size);
         void set_item_alignment(entity_view_item_visual_align align);
         void set_header_enabled(bool enabled);
+        void set_indent(int scale);
         
         entity_view_mode viewmode() const;
         QList<QModelIndex> selected_indexes() const;

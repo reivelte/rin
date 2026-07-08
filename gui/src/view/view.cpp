@@ -142,6 +142,17 @@ namespace rin
         }
     }
 
+    void entity_view::set_indent(int scale)
+    {
+        if (viewmode() == entity_view_mode::List)
+        {
+            auto* lv = m->as<list_mode*>();
+            lv->x_indent_scale = scale;
+            lv->clear_layout_data();
+            scheduleDelayedItemsLayout();
+        }
+    }
+
     entity_view_mode entity_view::viewmode() const
     {
         return m->current_viewmode;
