@@ -7,6 +7,7 @@
 #include <QtGui/QPainter>
 #include <QtGui/QTextOption>
 #include "model/entitymodel.hpp"
+#include "view/header.hpp"
 #include "view/view.hpp"
 #include "tag_listing.hpp"
 
@@ -67,9 +68,13 @@ namespace rin
     void tag_listing::resizeEvent(QResizeEvent* event)
     {
         QFrame::resizeEvent(event);
-        if (m_view)
+        if (m_mode == Oneline)
         {
-            m_view->resize(event->size());
+            if (m_view)
+            {
+                m_view->resize(event->size());
+                m_view->header()->resizeSection(0, width() / 2);
+            }
         }
     }
 
@@ -121,12 +126,11 @@ namespace rin
         if (mode == Oneline)
         {
             m_view = new entity_view(this);
+            m_view->setModel(m_model);
             m_view->set_viewmode(entity_view_mode::List);
-            m_view->set_header_enabled(false);
             m_view->set_indent(0);
             m_view->set_iconsize(QSize(0, 0));
             m_view->resize(width(), height());
-            m_view->setModel(m_model);
             m_default_populate_view();
         }
         else if (mode == Block)
