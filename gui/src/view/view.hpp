@@ -9,6 +9,7 @@
 
 namespace rin
 {
+    class entity_view_header;
     enum class entity_view_mode : int8_t { Icon, List };
     enum class entity_view_item_visual_align : int8_t { Center, Top, Bottom };
 
@@ -27,6 +28,7 @@ namespace rin
         void set_indent(int scale);
         
         entity_view_mode viewmode() const;
+        entity_view_header* header() const;
         QList<QModelIndex> selected_indexes() const;
         QList<QModelIndex> expanded_indexes() const;
 

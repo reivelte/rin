@@ -7,9 +7,9 @@
 #include <stack>
 #include <unordered_set>
 #include <QtCore/QHash>
-#include <QtWidgets/QHeaderView>
 #include <QtGui/QPainter>
 #include <suzuri/types.hpp>
+#include "../header.hpp"
 #include "core.cc"
 
 namespace rin
@@ -59,7 +59,7 @@ namespace rin
         std::unordered_set<QString> autoexpand_nodes; // when model_is_entity_model
         std::array<QMetaObject::Connection, 5> header_conns;
         QMetaObject::Connection sortheader_conn;
-        QHeaderView* header;
+        entity_view_header* header;
         int visible_items;
         int padding_y;
         int x_indent_scale;
@@ -84,9 +84,9 @@ namespace rin
         void clear() override;
         void scroll_contents_by(int dx, int dy, bool scroll_elastic_band) override;
         
-        /* for QHeaderView and friends */
+        /* for entity_view_header */
         void disconnect_all();
-        void set_header(QHeaderView* h);
+        void set_header(entity_view_header* h);
         void hide_column(int col);
         void show_column(int col);
         void resize_column_to_contents(int col);
@@ -143,7 +143,7 @@ namespace rin
     : entity_view::impl(parent), header(nullptr)
     {
         init();
-        set_header(new QHeaderView(Qt::Horizontal, view));
+        set_header(new entity_view_header(view));
     }
 
     entity_view::list_mode::~list_mode()
@@ -362,7 +362,7 @@ namespace rin
         QObject::disconnect(sortheader_conn);
     }
 
-    void entity_view::list_mode::set_header(QHeaderView* h)
+    void entity_view::list_mode::set_header(entity_view_header* h)
     {
         if (header == h || !h)
         { return; }
@@ -386,11 +386,10 @@ namespace rin
         }
 
         header_conns = {
-            view->connect(header, &QHeaderView::sectionResized, view, &entity_view::column_resized),
-            view->connect(header, &QHeaderView::sectionMoved, view, &entity_view::column_moved),
-            view->connect(header, &QHeaderView::sectionCountChanged, view, &entity_view::column_count_changed),
-            view->connect(header, &QHeaderView::sectionHandleDoubleClicked, view, &entity_view::column_handle_double_clicked)
-            // view->connect(header, &QHeaderView::geometriesChanged, view, &entity_view::updateGeometries)
+            view->connect(header, &entity_view_header::sectionResized, view, &entity_view::column_resized),
+            view->connect(header, &entity_view_header::sectionMoved, view, &entity_view::column_moved),
+            view->connect(header, &entity_view_header::sectionCountChanged, view, &entity_view::column_count_changed),
+            view->connect(header, &entity_view_header::sectionHandleDoubleClicked, view, &entity_view::column_handle_double_clicked)
         };
 
         // sorting is always enabled for entity_view
@@ -402,7 +401,7 @@ namespace rin
             view->sort_by_column(header->sortIndicatorSection(), header->sortIndicatorOrder());
         }
         
-        sortheader_conn = view->connect(header, &QHeaderView::sortIndicatorChanged, view, &entity_view::sort_by_column, Qt::UniqueConnection);
+        sortheader_conn = view->connect(header, &entity_view_header::sortIndicatorChanged, view, &entity_view::sort_by_column, Qt::UniqueConnection);
         view->updateGeometry();
     }
 

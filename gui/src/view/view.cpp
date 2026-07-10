@@ -137,7 +137,7 @@ namespace rin
             }
             
             if (enabled)
-            { lv->set_header(new QHeaderView(Qt::Horizontal, this)); }
+            { lv->set_header(new entity_view_header(this)); }
             update();
         }
     }
@@ -156,6 +156,16 @@ namespace rin
     entity_view_mode entity_view::viewmode() const
     {
         return m->current_viewmode;
+    }
+
+    entity_view_header* entity_view::header() const
+    {
+        if (viewmode() == entity_view_mode::List)
+        {
+            auto* lv = m->as<list_mode*>();
+            return lv->header;
+        }
+        return nullptr;
     }
 
     QList<QModelIndex> entity_view::selected_indexes() const

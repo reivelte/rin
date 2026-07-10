@@ -11,52 +11,54 @@ find_package(SQLite3 REQUIRED)
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Svg)
 
 set(SOURCES #!BEGIN: SOURCE LIST
-  src/window.cpp
   src/main.cpp
-  src/tagger/tag_panel.cpp
+  src/window.cpp
   src/tagger/tagger.cpp
-  src/view/delegate.cpp
+  src/tagger/tag_panel.cpp
+  src/model/common.cpp
+  src/model/thumbnailmanager.cpp
+  src/model/entitymodel.cpp
+  src/model/tree.cpp
+  src/model/historymanager.cpp
+  src/model/datamanager.cpp
   src/view/view.cpp
-  src/widgets/panel.cpp
-  src/widgets/resizing_textedit.cpp
-  src/widgets/details_panel.cpp
+  src/view/header.cpp
+  src/view/delegate.cpp
   src/widgets/navigationpanel.cpp
   src/widgets/iconsizer.cpp
   src/widgets/tag_listing.cpp
-  src/widgets/dialogs/settings.cpp
-  src/widgets/dialogs/sidecar.cpp
+  src/widgets/resizing_textedit.cpp
+  src/widgets/details_panel.cpp
+  src/widgets/panel.cpp
   src/widgets/dialogs/domain.cpp
-  src/model/entitymodel.cpp
-  src/model/common.cpp
-  src/model/datamanager.cpp
-  src/model/thumbnailmanager.cpp
-  src/model/historymanager.cpp
-  src/model/tree.cpp
+  src/widgets/dialogs/sidecar.cpp
+  src/widgets/dialogs/settings.cpp
   src/window.hpp
   src/rin.hpp
-  src/tagger/tag_panel.hpp
-  src/tagger/tagger.hpp
-  src/view/delegate.hpp
-  src/view/view.hpp
-  src/widgets/panel.hpp
-  src/widgets/details_panel.hpp
-  src/widgets/resizing_textedit.hpp
-  src/widgets/navigationpanel.hpp
-  src/widgets/iconsizer.hpp
-  src/widgets/tag_listing.hpp
-  src/widgets/dialogs/settings.hpp
-  src/widgets/dialogs/sidecar.hpp
-  src/widgets/dialogs/domain.hpp
-  src/utility/painting.hpp
-  src/utility/sizing.hpp
   src/utility/bsp.hpp
+  src/utility/sizing.hpp
+  src/utility/painting.hpp
+  src/tagger/tagger.hpp
+  src/tagger/tag_panel.hpp
+  src/model/common.hpp
+  src/model/entity.hpp
+  src/model/thumbnailmanager.hpp
+  src/model/historymanager.hpp
   src/model/datamanager.hpp
   src/model/entitymodel.hpp
-  src/model/entity.hpp
-  src/model/common.hpp
-  src/model/thumbnailmanager.hpp
   src/model/tree.hpp
-  src/model/historymanager.hpp
+  src/view/view.hpp
+  src/view/delegate.hpp
+  src/view/header.hpp
+  src/widgets/tag_listing.hpp
+  src/widgets/iconsizer.hpp
+  src/widgets/resizing_textedit.hpp
+  src/widgets/navigationpanel.hpp
+  src/widgets/panel.hpp
+  src/widgets/details_panel.hpp
+  src/widgets/dialogs/domain.hpp
+  src/widgets/dialogs/sidecar.hpp
+  src/widgets/dialogs/settings.hpp
 ) #!END: SOURCE LIST
 
 add_executable(${PROJECT_NAME})
