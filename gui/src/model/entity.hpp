@@ -116,6 +116,8 @@ namespace rin
         ENT_ATTR_TMPL(T) const T& attribute(entity_attribute_type attr = entity_attribute_type::Null_Attribute) const;
         ENT_ATTR_TMPL(T) T& attribute(entity_attribute_type attr = entity_attribute_type::Null_Attribute);
 
+        inline const std::unordered_map<entity_attribute_type, entity_attribute>& attribute_map() const;
+
         inline int key() const;
         inline int parent_key() const;
         
@@ -213,6 +215,11 @@ namespace rin
         entity_attribute& a = m_attributes[t];
         assert(std::holds_alternative<T>(a));
         return std::get<T>(a);
+    }
+
+    inline const std::unordered_map<entity_attribute_type, entity_attribute>& reflexive_entity::attribute_map() const
+    {
+        return m_attributes;
     }
 
     inline int reflexive_entity::key() const
