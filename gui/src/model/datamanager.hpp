@@ -360,7 +360,7 @@ namespace rin
     }
 
     template <detail::is_data_source Source>
-    inline bool entity_data_manager::m_push_result(reflexive_entity &&x, QElapsedTimer &t, Source &source, entity_tree_node &node, int64_t &retrieved_this_time, int &start)
+    inline bool entity_data_manager::m_push_result(reflexive_entity&& e, QElapsedTimer& t, Source& source, entity_tree_node& node, int64_t& retrieved_this_time, int& start)
     {
         using enum entity_tree_node_state;
         using enum entity_attribute_type;
@@ -368,17 +368,17 @@ namespace rin
         const bool time_is_up = false;
         const bool do_interrupt = m_do_interrupt.test();
         
-        const QString name = x.attribute<QString>(Name);
+        const QString name = e.attribute<QString>(Name);
 
         if (const QString ft = node.descriptor.full_text(); m_invalidated.contains(ft) && m_invalidated[ft].contains(name))
         { m_invalidated[ft].erase(name); }
 
-        x.set_parent_key(node.key);
-        m_adjust_count(node.descriptor, x, true); // descriptors are always redone for invalidates
+        e.set_parent_key(node.key);
+        m_adjust_count(node.descriptor, e, true); // descriptors are always redone for invalidates
         
         if (!node.contains(name))
         {
-            node.insert(std::move(x));
+            node.insert(std::move(e));
         }
         
         ++retrieved_this_time;
