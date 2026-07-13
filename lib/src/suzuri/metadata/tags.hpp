@@ -37,7 +37,7 @@ namespace sz::metadata
         sz::entity_database& db,
         const parameters& args,
         Func callback, ErrFunc error_callback,
-        bool recursively_tag_directories, bool verbose
+        bool tag_encountered_directories, bool verbose
     );
 
     template <typename Func, typename ErrFunc> requires
