@@ -41,6 +41,7 @@
                                     "\''${workspaceFolder}/build/debug/lib/src/${suzuri.name}",
                                     "\''${workspaceFolder}/lib/ext/nlohmann/json/include",
                                     "\''${workspaceFolder}/lib/ext/ToruNiina/toml11/include",
+                                    "\''${workspaceFolder}/lib/ext/Neargye/magic_enum/include",
                                     ${(if stdenv.isLinux 
                                         then (lib.concatStrings [
                                             "\"${qt6.qtbase}/include\","

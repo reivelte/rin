@@ -22,22 +22,12 @@ namespace rin
     static constexpr size_t s_default_batchsize = 10000;
     static constexpr size_t s_max_in_memory = 100000;
 
-    // TODO: enum reflection
-    using enum entity_attribute_type;
-    static constexpr std::array<std::tuple<entity_attribute_type, const char*>, 10> s_field_names = {{
-        {Name, "Name"}, 
-        {Size, "Size"}, 
-        {Modified, "Modified"}, {Created, "Created"}, {Accessed, "Accessed"}, 
-        {File_Type, "Type"}, 
-        {Rating, "Rating"}, {Tags, "Tags"}, {Comments, "Comments"}, {Description, "Description"}
-    }};
-
     entity_model::entity_model(QObject* parent, const std::filesystem::path& database_path) :
         QAbstractItemModel(parent), 
         m_dataman(std::make_unique<entity_data_manager>(database_path)), m_database_path(database_path),
         m_historyman(), m_thumbman(),
         m_tree(),
-        m_thumbnails(), m_items_pending_update(), m_field_names(),
+        m_thumbnails(), m_items_pending_update(),
         m_pending_queries(), m_delayed_sorts(), m_pending_query_timer(), m_delayed_sort_timer(),
         m_root(std::nullopt), m_sort_column(std::nullopt), m_sort_order(std::nullopt),
         m_thumbnail_target_size(256, 256),
@@ -81,14 +71,10 @@ namespace rin
         connect(dataman, &entity_data_manager::fetch_failed, this, &entity_model::handle_fetch_failure);
 
         m_dataman->set_watcher_enabled(true);
-
-        // TODO: better way of doing this
-        m_field_names = std::vector<std::tuple<entity_attribute_type, QString>>{
-            s_field_names[0],
-            s_field_names[1],
-            s_field_names[5],
-            s_field_names[2]
-        };
+        set_display_attributes({
+            Name, Size, Modified, File_Type
+        });
+        set_display_attribute_string(File_Type, "Type");
     }
 
     entity_model::~entity_model()
@@ -119,6 +105,20 @@ namespace rin
         // TODO: mark all nodes for rescan
         m_dataman->clear();
         m_dataman->set_database(path);
+    }
+
+    void entity_model::set_display_attributes(const std::vector<entity_attribute_type>& attrs)
+    {
+        m_attribute_section_positions = attrs;
+        for (auto k : attrs)
+        {
+            m_attribute_names[k] = QString::fromStdString(sz::utility::to_string(k));
+        }
+    }
+
+    void entity_model::set_display_attribute_string(entity_attribute_type attr, QString str)
+    {
+        m_attribute_names[attr] = str;
     }
 
     // root queries with no preexisting item entry have a -1 row value in the returned index
@@ -454,7 +454,7 @@ namespace rin
     int entity_model::columnCount(const QModelIndex& parent) const
     {
         Q_UNUSED(parent);
-        return static_cast<int>(m_field_names.size());
+        return static_cast<int>(m_attribute_section_positions.size());
     }
 
     bool entity_model::hasChildren(const QModelIndex& parent) const
@@ -479,11 +479,14 @@ namespace rin
         {
         case Qt::DisplayRole:
         {
-            // m_field_names should only point to string-based attributes
-            if (const entity_attribute_type attr = std::get<0>(m_field_names[col]); item.has_attribute(attr))
+            // TODO: handling non-string attributes (need to_string() impls for all attributes)
+            if (std::cmp_less(col, m_attribute_section_positions.size()))
             {
-                // TODO: stronger run-time validation of attribute type
-                return item.attribute<QString>(attr);
+                if (const entity_attribute_type attr = m_attribute_section_positions[col]; item.has_attribute(attr))
+                {
+                    // TODO: stronger run-time validation of attribute type
+                    return item.attribute<QString>(attr);
+                }
             }
             break;
         }
@@ -595,29 +598,29 @@ namespace rin
     QVariant entity_model::headerData(int section, Qt::Orientation orientation, int role) const
     {
         if (
-            std::cmp_greater_equal(section, m_field_names.size()) ||
+            std::cmp_greater_equal(section, m_attribute_section_positions.size()) ||
             (section < 0) ||
             (orientation == Qt::Orientation::Vertical) ||
             (role != Qt::DisplayRole)
         )
         { return QVariant(); }
 
-        return std::get<1>(m_field_names[section]);
+        return m_attribute_names.at(m_attribute_section_positions[section]);
     }
 
-    // TODO: When reimplementing this function, the headerDataChanged() signal must be emitted explicitly.
     bool entity_model::setHeaderData(int section, Qt::Orientation orientation, const QVariant& value, int role)
     {
         if (
-            std::cmp_greater_equal(section, m_field_names.size()) ||
+            std::cmp_greater_equal(section, m_attribute_section_positions.size()) ||
             (section < 0) ||
             (orientation == Qt::Orientation::Vertical) ||
-            (role != Qt::EditRole) ||
+            (role != Qt::DisplayRole && role != Qt::EditRole) ||
             (value.userType() != QMetaType::QString)
         )
         { return false; }
 
-        m_field_names[section] = {entity_attribute_type(section), value.toString()}; // ???
+        set_display_attribute_string(m_attribute_section_positions[section], value.toString());
+        emit headerDataChanged(orientation, section, section);
         return true;
     }
 
@@ -639,7 +642,7 @@ namespace rin
         for (const auto& index : indexes)
         {
             const auto& item = m_item_for_index(index);
-            if ((item.type() == File) && std::get<0>(m_field_names[index.column()]) == Name)
+            if ((item.type() == File) && std::cmp_less(index.column(), m_attribute_section_positions.size()) && m_attribute_section_positions[index.column()] == Name)
             {
                 urls << QUrl::fromLocalFile(m_absolute_path_for_file_entity(index));
             }
@@ -1384,9 +1387,9 @@ namespace rin
         assert(query_text.size());
         std::optional<entity_attribute_type> sort_key = std::nullopt;
         std::optional<Qt::SortOrder> sort_order = std::nullopt;
-        if (m_sort_column && m_sort_order)
+        if (m_sort_column && m_sort_order && std::cmp_less(*m_sort_column, m_attribute_section_positions.size()))
         {
-            sort_key = std::get<0>(m_field_names[*m_sort_column]);
+            sort_key = m_attribute_section_positions[*m_sort_column];
             sort_order = m_sort_order;
         }
         m_dataman->query(query_text, m_tree, index, parent_key, sort_key, sort_order);
@@ -1587,7 +1590,7 @@ namespace rin
         if (m_tree.contains(key))
         {
             const auto& node = m_node_for_key(key);
-            return (r >= -1 && std::cmp_less(r, node.items.size())) && (c >= 0 && std::cmp_less(c, m_field_names.size()));
+            return (r >= -1 && std::cmp_less(r, node.items.size())) && (c >= 0 && std::cmp_less(c, m_attribute_section_positions.size()));
         }
 
         return false;
@@ -1605,7 +1608,7 @@ namespace rin
         if (column < 0 || column >= columnCount() || !m_tree.contains(key))
         { return; }
 
-        m_async_sort(key, std::get<0>(m_field_names[column]), order);
+        m_async_sort(key, m_attribute_section_positions[column], order);
     }
 
     inline void entity_model::m_async_sort(int key, entity_attribute_type sort_key, Qt::SortOrder sort_order)
@@ -1628,7 +1631,7 @@ namespace rin
         QList<QModelIndex> old_indexes;
         QList<QModelIndex> new_indexes;
         auto& node = m_tree[key];
-        node.descriptor.sort_key = std::get<0>(m_field_names[column]);
+        node.descriptor.sort_key = m_attribute_section_positions[column];
         node.descriptor.sort_order = order;
         rin::sort_entities(node);
         for (int i = 0; std::cmp_less(i, node.size()); ++i)

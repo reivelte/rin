@@ -66,6 +66,8 @@ namespace rin
         void set_batchsize(size_t size);
         void set_readonly(bool readonly);
         void set_database(const std::filesystem::path& path);
+        void set_display_attributes(const std::vector<entity_attribute_type>& attrs);
+        void set_display_attribute_string(entity_attribute_type attr, QString str);
         
         QModelIndex query(const QString& text);
         QModelIndex query(const QString& text, const QList<QUrl>& urls);
@@ -209,6 +211,7 @@ namespace rin
         inline void m_sort(int key, int column, Qt::SortOrder order);
         
         private:
+        using enum entity_attribute_type;
         std::unique_ptr<entity_data_manager> m_dataman;
         std::filesystem::path m_database_path;
         history_manager m_historyman;
@@ -219,7 +222,8 @@ namespace rin
         std::unordered_map<int, std::unordered_map<QString, QPixmap>> m_thumbnails; // TODO: the thumbnail manager should hold this for us
         std::unordered_map<QString, std::unordered_map<QString, item_temp_data>> m_items_pending_update;
         std::unordered_map<QString, index_descriptor> m_in_progress_db_writes;
-        std::vector<std::tuple<entity_attribute_type, QString>> m_field_names; // index is logical column value
+        std::unordered_map<entity_attribute_type, QString> m_attribute_names; // key to string representation of key (user-modifiable)
+        std::vector<entity_attribute_type> m_attribute_section_positions; // index is logical column value
         std::deque<QString> m_pending_queries; // TODO: this should be a tuple of string and query type
         std::deque<int> m_delayed_sorts;
         std::deque<std::tuple<int, int>> m_delayed_info_fetches; // key, start_index

@@ -7,6 +7,7 @@
 #include <string_view>
 #include <vector>
 #include <algorithm>
+#include <magic_enum/magic_enum.hpp>
 #include <sz_export.hpp>
 #include "../result.hpp"
 
@@ -33,6 +34,15 @@ namespace sz::utility
         auto front = s.cbegin();
         auto back = std::find_if_not(s.rbegin(), s.rend(), [&](char c){ return c == what; }).base();
         return (front < back) ? std::string_view(front, back) : std::string_view{};
+    }
+
+    template <typename T>
+    SZ_API constexpr std::string to_string(const T& x)
+    {
+        if constexpr (std::is_enum_v<T>)
+        { return std::string(magic_enum::enum_name(x)); }
+
+        return std::string();
     }
     
     SZ_API std::vector<std::string> split(std::string_view on, std::string_view s);

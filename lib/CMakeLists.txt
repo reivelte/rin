@@ -134,6 +134,7 @@ target_include_directories(${PROJECT_NAME}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/src/${PROJECT_NAME}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ext/nlohmann/json/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ext/ToruNiina/toml11/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ext/Neargye/magic_enum/include>
     $<BUILD_INTERFACE:${Botan_INCLUDE_DIRS}>
     $<BUILD_INTERFACE:${SQLite3_INCLUDE_DIRS}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -176,6 +177,7 @@ if(${SZ_INSTALL} AND NOT CMAKE_SKIP_INSTALL_RULES)
   # TODO: automated way to install all vendor local (not from FindPackage) includes
   install(FILES ext/nlohmann/json/include/nlohmann/json.hpp DESTINATION include/nlohmann)
   install(FILES ext/ToruNiina/toml11/include/toml.hpp DESTINATION include/)
+  install(FILES ext/Neargye/magic_enum/include/magic_enum/magic_enum.hpp DESTINATION include/magic_enum)
 
   set(targets_file "${PROJECT_NAME}-static-targets.cmake")
   if(BUILD_SHARED_LIBS)
