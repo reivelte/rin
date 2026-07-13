@@ -258,6 +258,7 @@ namespace rin
         sz::metadata::tag_input(path, m_database, args,
             [&](std::filesystem::path p, const std::vector<std::string>& tags, sz::result_code rc) -> bool
             {
+                Q_UNUSED(rc); // TODO: log warning and/or show a warning dialog
                 qDebug() << "tag item: " << p.string() << " with: " << tags;
                 ++tags_applied;
                 return false;
