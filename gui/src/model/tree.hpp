@@ -42,6 +42,7 @@ namespace rin
             items.reserve(n);
             positions.reserve(n);
         }
+
         void insert(reflexive_entity&& e)
         {
             const auto name = e.attribute<QString>(entity_attribute_type::Name);
@@ -49,15 +50,18 @@ namespace rin
             positions.emplace_back(name);
             items.emplace(name, std::move(e));
         }
+
         void erase(const QString& name)
         {
             items.erase(name);
             auto new_end = std::remove(positions.begin(), positions.end(), name);
             positions.erase(new_end, positions.end());
         }
+
         int size() const { return static_cast<int>(items.size()); }
         bool contains(const QString& name) const { return items.contains(name); }
         bool contains(int i) const { return 0 <= i && i < size(); }
+        
         QString id(const QString& name) const
         {
             if (const auto& item = items.at(name); item.type() == sz::entity_type::File)
@@ -66,6 +70,7 @@ namespace rin
             }
             return name;
         }
+
         int index_of(const QString& name) const
         {
             int i = 0;
