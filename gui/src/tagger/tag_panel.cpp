@@ -12,11 +12,11 @@ namespace rin
         ui_panel(parent),
         m_model(model), m_lineedit(nullptr), m_vbox(nullptr)
     {
-        m_tag_list = new tag_listing(this, model, tag_listing::viewmode::Block);
+        m_view = new tag_view(this, model, tag_view::viewmode::Block);
         m_lineedit = new QLineEdit(this);
 
         m_vbox = new QVBoxLayout(this);
-        m_vbox->addWidget(m_tag_list);
+        m_vbox->addWidget(m_view);
         m_vbox->addWidget(m_lineedit);
 
         connect(m_lineedit, &QLineEdit::returnPressed, this, &tag_panel::read_or_submit_input);
@@ -32,12 +32,12 @@ namespace rin
     {
         if (auto text = m_lineedit->text().toStdString(); text.empty())
         {
-            emit tags_submitted(m_tag_list->current_tags());
+            emit tags_submitted(m_view->tags());
             return;
         }
         else
         {
-            std::vector<reflexive_entity> tag_entities;
+            std::vector<reflexive_entity> tags;
             auto inputs = sz::utility::split(",", text);
             for (auto& input : inputs)
             {
@@ -50,12 +50,12 @@ namespace rin
                     }
                     else
                     {
-                        tag_entities.emplace_back(QString::fromStdString(input), sz::entity_type::Tag);
+                        tags.emplace_back(QString::fromStdString(input), sz::entity_type::Tag);
                     }
                 }
             }
             m_lineedit->clear();
-            m_tag_list->add_tags(tag_entities);
+            m_view->append_tags(tags);
         }
     }
 

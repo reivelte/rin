@@ -28,8 +28,8 @@ QT_END_NAMESPACE
 namespace rin
 {
     class entity_view;
+    class tag_view;
     class navigation_panel;
-    class tag_listing;
     class icon_sizer;
     class domain_dialog;
     class main_window : public QMainWindow
@@ -114,7 +114,6 @@ namespace rin
         std::filesystem::path m_database_path;
         
         QSplitter* m_nav_splitter;
-        tag_listing* m_tag_listing;
         QToolBar* m_nav_bar;
 
         QToolBar* m_details_bar;
@@ -139,6 +138,7 @@ namespace rin
         icon_sizer* m_icon_sizer;
         QLineEdit* m_lineedit;
         entity_view* m_view;
+        tag_view* m_tag_view;
         entity_model* m_model; // TODO: proxy models
         
     };

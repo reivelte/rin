@@ -26,10 +26,10 @@ set(SOURCES #!BEGIN: SOURCE LIST
   src/view/delegate.cpp
   src/widgets/navigationpanel.cpp
   src/widgets/iconsizer.cpp
-  src/widgets/tag_listing.cpp
   src/widgets/resizing_textedit.cpp
   src/widgets/details_panel.cpp
   src/widgets/panel.cpp
+  src/widgets/tag_view/tag_view.cpp
   src/widgets/dialogs/domain.cpp
   src/widgets/dialogs/sidecar.cpp
   src/widgets/dialogs/settings.cpp
@@ -50,12 +50,12 @@ set(SOURCES #!BEGIN: SOURCE LIST
   src/view/view.hpp
   src/view/delegate.hpp
   src/view/header.hpp
-  src/widgets/tag_listing.hpp
   src/widgets/iconsizer.hpp
   src/widgets/resizing_textedit.hpp
   src/widgets/navigationpanel.hpp
   src/widgets/panel.hpp
   src/widgets/details_panel.hpp
+  src/widgets/tag_view/tag_view.hpp
   src/widgets/dialogs/domain.hpp
   src/widgets/dialogs/sidecar.hpp
   src/widgets/dialogs/settings.hpp

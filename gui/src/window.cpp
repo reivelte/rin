@@ -24,7 +24,7 @@
 #include "window.hpp"
 #include "view/view.hpp"
 #include "widgets/navigationpanel.hpp"
-#include "widgets/tag_listing.hpp"
+#include "widgets/tag_view/tag_view.hpp"
 #include "widgets/iconsizer.hpp"
 #include "widgets/dialogs/domain.hpp"
 
@@ -127,11 +127,12 @@ namespace rin
             }
         }
 
-        m_tag_listing = new tag_listing(this, m_model, tag_listing::viewmode::Oneline);
+        m_tag_view = new tag_view(nullptr, m_model, tag_view::viewmode::Oneline);
+        m_tag_view->default_populate();
 
         m_nav_splitter = new QSplitter(Qt::Orientation::Vertical);
         m_nav_splitter->addWidget(m_navpanel);
-        m_nav_splitter->addWidget(m_tag_listing);
+        m_nav_splitter->addWidget(m_tag_view);
         
         m_nav_bar = new QToolBar("Navigation", this);
         m_nav_bar->setAllowedAreas(Qt::ToolBarArea::LeftToolBarArea | Qt::ToolBarArea::RightToolBarArea);

@@ -7,7 +7,7 @@
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QVBoxLayout>
 #include "widgets/panel.hpp"
-#include "widgets/tag_listing.hpp"
+#include "widgets/tag_view/tag_view.hpp"
 #include "model/entity.hpp"
 #include "model/entitymodel.hpp"
 
@@ -29,7 +29,7 @@ namespace rin
 
         private:
         entity_model* m_model;
-        tag_listing* m_tag_list;
+        tag_view* m_view;
         QLineEdit* m_lineedit;
         QVBoxLayout* m_vbox;
 
