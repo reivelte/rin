@@ -75,12 +75,15 @@ namespace rin
         void tag(const QModelIndex& index, const std::vector<reflexive_entity>& tag_entities);
         void tag(const QModelIndex& index, const sz::metadata::parameters& args);
         void tag(const QString& entity_id, const sz::metadata::parameters& args);
+
+        void append_data(const QModelIndex& parent, const std::vector<reflexive_entity>& data);
         
         sz::result<QModelIndex> step(bool forward = true);
         void watch(const QModelIndex& index);
         void unwatch(const QModelIndex& index);
         
         bool remove(const QModelIndex& index, bool recycle = true);
+        void clear(const QModelIndex& parent);
         
         void clear_thumbnails();
         void request_thumbnails(const std::vector<QModelIndex>& indexes, const std::vector<QSize>& sizes);
@@ -145,6 +148,7 @@ namespace rin
         void insert(const entity_tree_node& updated_node, int start, int end);
         void insert(const query_descriptor& qd, const std::vector<reflexive_entity>& data);
         void remove(const query_descriptor& qd, const std::vector<std::tuple<QString, int>>& to_remove);
+        void clear(int key);
         void invalidate(const QString& query_text);
         void invalidate(const QString& query_text, const QList<QUrl>& urls);
         void update(const query_descriptor& qd, std::vector<reflexive_entity> data);
@@ -205,6 +209,7 @@ namespace rin
         inline const reflexive_entity& m_item_for_index(const QModelIndex& index) const;
         inline QModelIndex m_reset_root_query(const QString& text);
         inline bool m_valid_index(const QModelIndex& index) const;
+        inline bool m_is_concept(const QModelIndex& index) const;
         inline const QPixmap& m_thumbnail_for_index(const QModelIndex& index) const;
         inline void m_async_sort(int key, int column, Qt::SortOrder order);
         inline void m_async_sort(int key, entity_attribute_type sort_key, Qt::SortOrder sort_order);

@@ -223,6 +223,15 @@ namespace rin
         { m_in_progress_db_writes.emplace(entity_id, m_dataman->tag(entity_id, args)); }
     }
 
+    void entity_model::append_data(const QModelIndex& parent, const std::vector<reflexive_entity>& data)
+    {
+        if (m_is_concept(parent))
+        {
+            auto qd = m_tree[m_id_for_index(parent)].descriptor;
+            insert(qd, data);
+        }
+    }
+
     // void entity_model::query(const QList<QModelIndex>& indexes)
     // {
     //     using enum sz::entity_type;
@@ -285,6 +294,15 @@ namespace rin
             return true;
         }
         return false;
+    }
+
+    void entity_model::clear(const QModelIndex& parent)
+    {
+        if (m_valid_index(parent))
+        {
+            if (const auto query_text = m_id_for_index(parent); m_tree.contains(query_text))
+            { clear(m_tree[query_text].key); }
+        }
     }
 
     void entity_model::clear_thumbnails()
@@ -969,6 +987,20 @@ namespace rin
         }
     }
 
+    // TODO: need to account for pending updates and/or queries in the model's internal queue
+    void entity_model::clear(int key)
+    {
+        if (m_tree.contains(key))
+        {
+            auto& n = m_tree[key];
+            m_dataman->cancel_query(n.descriptor);
+            const QModelIndex idx = m_index_for_querytext(n.descriptor.text);
+            beginRemoveRows(idx, 0, n.size() - 1);
+            n.clear();
+            endRemoveRows();
+        }
+    }
+
     // expected to be called when the filesystem watcher inside dataman detects a change inside a watched dir
     // any isolated nodes as a result of the invalidate are taken care of in remove() when dataman detects isolated items
     // unwatching the path doesn't seem to be ideal here, as the path could change inbetween invalidates.
@@ -1594,6 +1626,12 @@ namespace rin
         }
 
         return false;
+    }
+
+    inline bool entity_model::m_is_concept(const QModelIndex& index) const
+    {
+        const auto id = m_id_for_index(index);
+        return id.startsWith("concept://") && m_tree.contains(id);
     }
 
     // does no checks
