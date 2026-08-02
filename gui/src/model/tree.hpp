@@ -58,6 +58,20 @@ namespace rin
             positions.erase(new_end, positions.end());
         }
 
+        void clear()
+        {
+            descriptor.size = 0;
+            descriptor.processed = 0;
+            descriptor.processed_extended = 0;
+            descriptor.filesize = 0;
+            descriptor.dir_count = 0;
+            descriptor.file_count = 0;
+            descriptor.tag_count = 0;
+            items.clear();
+            positions.clear();
+            state = entity_tree_node_state::Valid;
+        }
+
         int size() const { return static_cast<int>(items.size()); }
         bool contains(const QString& name) const { return items.contains(name); }
         bool contains(int i) const { return 0 <= i && i < size(); }
