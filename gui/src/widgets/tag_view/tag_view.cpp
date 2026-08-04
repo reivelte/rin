@@ -134,6 +134,8 @@ namespace rin
         default: { return; }
         }
 
+        m_mode = mode;
+
         if (m_thumbnails_enabled)
         { set_iconsize(QSize(m_thumb_size, m_thumb_size)); }
         else
