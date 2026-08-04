@@ -377,6 +377,9 @@ namespace rin
 
     void entity_view::setRootIndex(const QModelIndex& index)
     {
+        if (index == m->root_index)
+        { return; }
+        
         qDebug() << "entity_view: setRootIndex: " << index;
         m->clear();
         clearSelection();
