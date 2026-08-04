@@ -122,8 +122,7 @@ namespace rin
 
     inline void tag_view::m_ensure_correct_root()
     {
-        if (rootIndex() != m_index_for_view_concept)
-        { setRootIndex(m_index_for_view_concept); }
+        setRootIndex(m_index_for_view_concept);
     }
 
     void tag_view::m_set_viewmode(tag_view::viewmode mode)
