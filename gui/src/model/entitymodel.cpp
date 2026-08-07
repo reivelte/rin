@@ -517,7 +517,7 @@ namespace rin
             const int key = item.parent_key();
             if (m_thumbnails.contains(key) && m_thumbnails.at(key).contains(item.attribute<QString>(Name)))
             {
-                return m_thumbnail_for_index(index);
+                return QIcon(m_thumbnail_for_index(index));
             }
             else if (item.has_attribute(Sizehint))
             {
