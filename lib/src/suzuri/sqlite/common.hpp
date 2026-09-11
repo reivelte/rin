@@ -54,6 +54,31 @@ namespace sz::sqlite
         requires !std::is_same_v<T, bool>;
         requires std::constructible_from<variant, T>;
     };
+
+    template <typename... Binds, std::size_t N = sizeof...(Binds)>
+    concept is_bindable_pack = requires
+    {
+        requires ((is_bindable<Binds> && ...) || ((std::ranges::range<Binds> && ...) && N == 1));
+    };
+
+    namespace detail
+    {
+        // assumes 'Binds' is a valid typename of a parameter pack
+        #define VECTOR_TYPE(PackName) typename std::decay_t<decltype((std::forward<Binds>(PackName), ...))>::value_type
+
+        template <typename T, typename... Binds> requires (sizeof...(Binds) == 1)
+        constexpr const std::vector<T>& to_vector(Binds&&... binds)
+        {
+            using VectorType = VECTOR_TYPE(binds);
+            static_assert(std::same_as<T, VectorType>, "Type mismatch");
+            static_assert(is_bindable<VectorType>, "Array of values must all be bindable or of sqlite::variant type");
+            const std::vector<VectorType>& vec = std::get<0>(std::tuple<Binds...>(std::forward<Binds>(binds)...));
+            return vec;
+        }
+
+        #define AS_VECTOR(X) detail::to_vector<VECTOR_TYPE(X)>(std::forward<Binds>(X)...)
+        
+    } // namespace detail
 }
 
 template <>

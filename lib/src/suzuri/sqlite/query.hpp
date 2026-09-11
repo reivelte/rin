@@ -225,7 +225,11 @@ namespace sz::sqlite
     template <typename... Binds, std::size_t N>
     inline bool database_query::has_same_binds(Binds&&... binds) const
     {
-        if constexpr (N)
+        if constexpr (N == 1 && is_vector<std::tuple_element_t<0, std::tuple<Binds...>>>)
+        {
+            return has_same_binds(AS_VECTOR(binds));
+        }
+        else if constexpr (N)
         {
             if (m_binds.size() != N)
             { return false; }
