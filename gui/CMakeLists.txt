@@ -29,6 +29,7 @@ set(SOURCES #!BEGIN: SOURCE LIST
   src/widgets/resizing_textedit.cpp
   src/widgets/details_panel.cpp
   src/widgets/panel.cpp
+  src/widgets/image.cpp
   src/widgets/tag_view/tag_view.cpp
   src/widgets/dialogs/domain.cpp
   src/widgets/dialogs/sidecar.cpp
@@ -55,6 +56,7 @@ set(SOURCES #!BEGIN: SOURCE LIST
   src/widgets/navigationpanel.hpp
   src/widgets/panel.hpp
   src/widgets/details_panel.hpp
+  src/widgets/image.hpp
   src/widgets/tag_view/tag_view.hpp
   src/widgets/dialogs/domain.hpp
   src/widgets/dialogs/sidecar.hpp
