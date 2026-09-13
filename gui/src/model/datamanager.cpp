@@ -573,16 +573,17 @@ namespace rin
         if (const QFileInfo info(short_text); info.isFile())
         { return entity_data_manager::data_source(m_database.tags(sz::entity_database_query{.string = short_text.toStdString()})); }
 
-        if (short_text.startsWith(s_query_cmd_tagsof.data(), Qt::CaseInsensitive)) // indexed
+        // TODO: entity_database needs to forbid starting a tag namespace with "!". it is reserved for the entity_data_manager
+        if (short_text.startsWith(s_query_cmd_taglist.data(), Qt::CaseInsensitive)) // indexed
         {
-            // TODO: entity_database needs to forbid starting a tag namespace with "!". it is reserved for the entity_data_manager
-            return entity_data_manager::data_source(m_database.tags(sz::entity_database_query{
-                .string = short_text.toStdString().substr(s_query_cmd_tagsof.size())
-            }));
-        }
-        else if (short_text.startsWith(s_query_cmd_taglist.data(), Qt::CaseInsensitive)) // indexed
-        {
-            return entity_data_manager::data_source(m_database.tags());
+            if (const std::string s = short_text.toStdString().substr(s_query_cmd_taglist.size()); s.size())
+            {
+                return entity_data_manager::data_source(m_database.tags(sz::entity_database_query{
+                    .string = s
+                }));
+            }
+            else
+            { return entity_data_manager::data_source(m_database.tags()); }
         }
         
         return entity_data_manager::data_source(m_database.files(sz::entity_database_query{
@@ -703,13 +704,18 @@ namespace rin
             e.set_attribute(Description, QString::fromStdString(dbinfo.description));
             e.set_attribute(Color, dbinfo.rgba);
 
-            sz::sqlite::database_query tags = m_database.tags(sz::entity_database_query{.string = id_});
-            tag_set tagset;
-            for (std::string_view tag : tags)
+            if (is_file)
             {
-                tagset.emplace(QString::fromUtf8(tag.data(), static_cast<qsizetype>(tag.size())));
+                sz::sqlite::database_query tags = m_database.tags(sz::entity_database_query{
+                    .string = id_
+                });
+                tag_set tagset;
+                for (std::string_view tag : tags)
+                {
+                    tagset.emplace(QString::fromUtf8(tag.data(), static_cast<qsizetype>(tag.size())));
+                }
+                e.set_attribute(Tags, std::move(tagset));
             }
-            e.set_attribute(Tags, std::move(tagset));
         }
     }
 

@@ -202,7 +202,7 @@ namespace rin
         bool m_push_result(reflexive_entity&& x, QElapsedTimer& t, Source& source, entity_tree_node& node, int64_t& retrieved_this_time, int& start);
 
         template <detail::is_data_source Source>
-        reflexive_entity m_item_from_source(const query_descriptor& qd, const Source& src, bool is_tagsof_query = false);
+        reflexive_entity m_item_from_source(const query_descriptor& qd, const Source& src, bool is_taglist_query = false);
 
         private:
         // accessed by multiple threads:
@@ -336,14 +336,14 @@ namespace rin
         {
             // TODO: handle cases where the database is busy/locked
             auto& db_src = static_cast<database_source&>(src);
-            const bool tagsof = node.descriptor.text.startsWith(s_query_cmd_tagsof.data(), Qt::CaseInsensitive);
+            const bool is_taglist_query = node.descriptor.text.startsWith(s_query_cmd_taglist.data(), Qt::CaseInsensitive);
             
             if (db_src.status() == sz::sqlite::status_code::OK)
             { ++db_src; } // the very beginning of a db query object does not point to a valid row, lets advance now
 
             while (db_src.good())
             {
-                if (m_push_result(m_item_from_source(node.descriptor, db_src, tagsof), timer, db_src, node, retrieved, start))
+                if (m_push_result(m_item_from_source(node.descriptor, db_src, is_taglist_query), timer, db_src, node, retrieved, start))
                 { break; }
             }
         }
@@ -429,13 +429,13 @@ namespace rin
     }
 
     template <detail::is_data_source Source>
-    inline reflexive_entity entity_data_manager::m_item_from_source(const query_descriptor& qd, const Source& src, bool is_tagsof_query)
+    inline reflexive_entity entity_data_manager::m_item_from_source(const query_descriptor& qd, const Source& src, bool is_taglist_query)
     {
         using namespace rin::detail;
         // in the call to m_make_item(), we pass false for 'fill_extended_attributes' here in all cases, so the value of is_indexed doesn't matter
         if constexpr (std::same_as<Source, filesystem_source>)
         {
-            Q_UNUSED(is_tagsof_query);
+            Q_UNUSED(is_taglist_query);
             const auto& fs_src = static_cast<const filesystem_source&>(src);
             const QFileInfo fsinfo = fs_src.it->fileInfo();
             const QString id = fsinfo.absoluteFilePath();
@@ -445,8 +445,8 @@ namespace rin
         {
             const auto& db_src = static_cast<const database_source&>(src);
             const QString id_qstr = QString::fromStdString(db_src.get<std::string>());
-            const QFileInfo fsinfo = is_tagsof_query ? QFileInfo() : QFileInfo(id_qstr);
-            const bool is_file = !is_tagsof_query;
+            const QFileInfo fsinfo = is_taglist_query ? QFileInfo() : QFileInfo(id_qstr);
+            const bool is_file = !is_taglist_query;
             return m_make_item(qd.text, id_qstr, fsinfo, is_file ? sz::entity_type::File : sz::entity_type::Tag, true, false);
         }
         else if constexpr (std::same_as<Source, concept_source>)
