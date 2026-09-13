@@ -301,7 +301,7 @@ namespace rin
         if (m_valid_index(parent))
         {
             if (const auto query_text = m_id_for_index(parent); m_tree.contains(query_text))
-            { clear(m_tree[query_text].key); }
+            { clear(m_tree[query_text].key, false); }
         }
     }
 
@@ -988,16 +988,22 @@ namespace rin
     }
 
     // TODO: need to account for pending updates and/or queries in the model's internal queue
-    void entity_model::clear(int key)
+    void entity_model::clear(int key, bool emit_signals)
     {
         if (m_tree.contains(key))
         {
             auto& n = m_tree[key];
             m_dataman->cancel_query(n.descriptor);
-            const QModelIndex idx = m_index_for_querytext(n.descriptor.text);
-            beginRemoveRows(idx, 0, n.size() - 1);
-            n.clear();
-            endRemoveRows();
+
+            if (emit_signals)
+            {
+                const QModelIndex idx = m_index_for_querytext(n.descriptor.text);
+                beginRemoveRows(idx, 0, n.size() - 1);
+                n.clear();
+                endRemoveRows();
+            }
+            else
+            { n.clear(); }
         }
     }
 

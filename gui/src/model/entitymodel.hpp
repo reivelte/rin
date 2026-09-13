@@ -148,7 +148,7 @@ namespace rin
         void insert(const entity_tree_node& updated_node, int start, int end);
         void insert(const query_descriptor& qd, const std::vector<reflexive_entity>& data);
         void remove(const query_descriptor& qd, const std::vector<std::tuple<QString, int>>& to_remove);
-        void clear(int key);
+        void clear(int key, bool emit_signals);
         void invalidate(const QString& query_text);
         void invalidate(const QString& query_text, const QList<QUrl>& urls);
         void update(const query_descriptor& qd, std::vector<reflexive_entity> data);
