@@ -502,8 +502,7 @@ namespace rin
 
     void main_window::select_item(const QModelIndex& index)
     {
-        auto e = m_model->at(index);
-        m_details_panel->set_item(e);
+        m_details_panel->set_item(index);
     }
 
     void main_window::contextMenuEvent(QContextMenuEvent* e)
