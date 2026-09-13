@@ -28,6 +28,14 @@ namespace rin
         }
         return QSizeF(w, h).toSize();
     }
+
+    constexpr int height_for_width(int w, qreal r)
+    {
+        if (r == 0)
+        { return 0; }
+
+        return qCeil(static_cast<qreal>(w) / r);
+    }
     
     constexpr int approximate_height(const QString& text, int max_width, qreal gw, int gh, int spacing_y)
     {
