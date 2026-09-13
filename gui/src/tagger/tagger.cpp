@@ -63,7 +63,7 @@ namespace rin
         if (e.has_attribute(File_Info))
         {
             qDebug() << "[tagger] set current item to: " << e.attribute<QString>(Name) << ", path: " << e.attribute<QFileInfo>().absoluteFilePath();
-            m_details_panel->set_item(e);
+            m_details_panel->set_item(index);
         }
     }
 
