@@ -1101,6 +1101,10 @@ namespace rin
     void entity_view::rowsAboutToBeRemoved(const QModelIndex& parent, int start, int end)
     {
         using enum list_mode_tree_node::node_state;
+        
+        if (end < start)
+        { return; }
+        
         QAbstractItemView::rowsAboutToBeRemoved(parent, start, end);
         
         qDebug() << "entity_view: rowsAboutToBeRemoved: " << parent << ", start: " << start << ", end: " << end;
