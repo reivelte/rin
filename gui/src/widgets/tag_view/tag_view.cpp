@@ -32,7 +32,7 @@ namespace rin
 
     void tag_view::clear()
     {
-        m_model->clear(rootIndex());
+        m_model->clear(m_index_for_view_concept);
     }
 
     void tag_view::append_tags(const std::vector<reflexive_entity> &tags)
