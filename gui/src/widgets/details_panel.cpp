@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include <QtWidgets/QStyle>
+#include <QtWidgets/QHBoxLayout>
 #include <QtGui/QPainter>
 #include <QtGui/QPaintEvent>
 #include <QtGui/QTextOption>
@@ -15,86 +16,114 @@
 namespace rin
 {
     details_panel::details_panel(QWidget* parent, entity_model* model) :
-        ui_panel(parent), m_model(model), m_items(), 
-        m_padding(20), m_panel_width(512)
+        ui_panel(parent),
+        m_items(), m_model(model),
+        m_thumbnail(nullptr), m_tagview(nullptr)
     {
+        if (!m_model)
+        { throw std::runtime_error("model was nullptr"); }
+
+        m_thumbnail = new ui_image(this, QPixmap());
+        m_tagview = new tag_view(this, m_model, tag_view::viewmode::Block);
+
+        connect(m_model, &entity_model::dataChanged, this, &details_panel::refresh_items);
+        connect(m_model, &entity_model::rowsInserted, this, &details_panel::insert_tags);
+        connect(m_model, qOverload<const QModelIndex&>(&entity_model::query_done), this, &details_panel::insert_tags);
     }
 
     details_panel::~details_panel()
     {
     }
 
-    void details_panel::set_item(const reflexive_entity& e)
+    void details_panel::set_item(const QModelIndex& index)
     {
         clear();
-        m_items.push_back(e);
+        if (m_model->valid_index(index))
+        {
+            m_items.push_back(index);
+
+            const auto& e = m_model->at(index);
+            if (e.has_attribute(Icon))
+            {
+                // calling model->data() instead of e.attribute() allows us to get an entity thumbnail if one exists
+                auto icon = qvariant_cast<QIcon>(m_model->data(index, Qt::ItemDataRole::DecorationRole));
+
+                // TODO: request an appropriate thumbnail from thumb manager for the current size of this widget
+                const auto s = rin::fit_under(size(), icon.actualSize(size(), QIcon::Mode::Normal, QIcon::State::On));
+                m_thumbnail->set_image(icon.pixmap(s));
+                
+                QRect thr = m_thumbnail->rect();
+                thr.setX(thr.x() + (rect().center().x() - thr.center().x()));
+                
+                m_thumbnail->move(thr.topLeft());
+            }
+            m_tagview->move(QPoint(0, m_thumbnail->height()));
+            m_tagview->resize(width(), height() - m_thumbnail->height());
+
+            QString id;
+            if (e.has_attribute(Id))
+            { id = e.attribute<QString>(Id); }
+            else
+            { id = m_model->id_for_index(index); }
+
+            QString q;
+            if (e.type() == sz::entity_type::File)
+            { q = "!taglist:file://" + id; }
+            else
+            { q = "!taglist:" + id; }
+
+            if (const QModelIndex node_index = m_model->query(q); m_model->valid_index(node_index))
+            { m_watching.insert(node_index); }
+        }
         update();
     }
 
-    void details_panel::set_items(const std::vector<reflexive_entity>& items)
+    void details_panel::set_items(const QList<QModelIndex>& indexes)
     {
         clear();
-        m_items = items;
+        m_items = indexes;
+
+        // TODO: thumbnails for selections of items
+
         update();
     }
 
     void details_panel::clear()
     {
         m_items.clear();
-    }
-
-    QSize details_panel::sizeHint() const
-    {
-        return QSize(m_panel_width, parentWidget()->height());
+        m_watching.clear();
+        m_tagview->clear();
+        update();
     }
 
     void details_panel::paintEvent(QPaintEvent* event)
     {
         using enum entity_attribute_type;
         QFrame::paintEvent(event);
-        QPainter painter(this);
-        const QRect r = rect();
-        const QSize max_thumb_size = rin::fit_under(r.size(), QSize(512, 512));
-        if (m_items.size() == 1)
-        {
-            const reflexive_entity& e = m_items[0];
-            QRect thumb_rect(QPoint(0, 0), rin::fit_under(max_thumb_size, QSize(512, 512)));
-            if (e.has_attribute(Icon))
-            {
-                const QIcon& icon = e.attribute<QIcon>();
-                const QSize thumb_size = e.has_attribute(Sizehint) ? 
-                    rin::fit_under(max_thumb_size, e.attribute<QSize>()) : 
-                    icon.actualSize(max_thumb_size, QIcon::Mode::Normal, QIcon::State::On);
-                
-                thumb_rect.setSize(thumb_size);
-                thumb_rect.moveCenter(r.center());
-                thumb_rect.setY(r.top() + m_padding);
+        // QPainter painter(this);
 
-                qDebug() << thumb_size;
-                if (const QPixmap thumb = m_model->thumbnail(e); !thumb.isNull())
-                { painter.drawPixmap(thumb_rect, thumb); }
-                else
-                { painter.drawPixmap(thumb_rect, icon.pixmap(thumb_size, QIcon::Mode::Normal, QIcon::State::On)); }
+        // if (m_items.size() == 1)
+        // {
+        //     QTextOption text_opt;
+        //     text_opt.setWrapMode(QTextOption::WrapMode::WrapAnywhere);
+        //     text_opt.setTextDirection(Qt::LayoutDirection::LeftToRight);
+        //     text_opt.setAlignment(QStyle::visualAlignment(Qt::LayoutDirection::LeftToRight, Qt::AlignmentFlag::AlignVCenter | Qt::AlignmentFlag::AlignHCenter));
 
-            }
-            else
-            {
-                // TODO
-                // use a default icon
-            }
+        //     // entities always have a name attribute
+        //     const auto name = e.attribute<QString>(Name);
+        //     QRect text_rect(QPoint(0, thumb_rect.bottom() + m_padding), QSize(r.width(), 40));
+        //     painter.drawText(text_rect, name, text_opt);
+        // }
+    }
 
-            QTextOption text_opt;
-            text_opt.setWrapMode(QTextOption::WrapMode::WrapAnywhere);
-            text_opt.setTextDirection(Qt::LayoutDirection::LeftToRight);
-            text_opt.setAlignment(QStyle::visualAlignment(Qt::LayoutDirection::LeftToRight, Qt::AlignmentFlag::AlignVCenter | Qt::AlignmentFlag::AlignHCenter));
+    void details_panel::resizeEvent(QResizeEvent* event)
+    {
+        ui_panel::resizeEvent(event);
 
-            // entities always have a name attribute
-            const auto name = e.attribute<QString>(Name);
-            QRect text_rect(QPoint(0, thumb_rect.bottom() + m_padding), QSize(r.width(), 40));
-            painter.drawText(text_rect, name, text_opt);
-
-            m_draw_tags(painter, e, QPoint(r.left(), text_rect.bottom()));
-        }
+        const int w = width();
+        m_thumbnail->resize(w, m_thumbnail->heightForWidth(w));
+        m_tagview->move(QPoint(0, m_thumbnail->height()));
+        m_tagview->resize(width(), height() - m_thumbnail->height());
     }
 
     void details_panel::mouseMoveEvent(QMouseEvent* event)
@@ -102,26 +131,32 @@ namespace rin
         ui_panel::mouseMoveEvent(event);
     }
 
-    QRect details_panel::m_draw_tags(QPainter& painter, const reflexive_entity& e, const QPoint& p)
+    void details_panel::insert_tags(const QModelIndex& parent)
     {
-        QTextOption text_opt;
-        text_opt.setWrapMode(QTextOption::WrapMode::WrapAnywhere);
-        text_opt.setTextDirection(Qt::LayoutDirection::LeftToRight);
-        text_opt.setAlignment(QStyle::visualAlignment(Qt::LayoutDirection::LeftToRight, Qt::AlignmentFlag::AlignVCenter | Qt::AlignmentFlag::AlignHCenter));
-        auto metrics = fontMetrics();
-
-        QRect area;
-        if (auto tags = e.attribute<tag_set>(); tags.size())
+        if (m_watching.contains(parent))
         {
-            auto layout = rin::layout_strings(tags, metrics, p, rect().right(), 10, 10);
-            for (const auto& [tag, tag_rect] : layout)
+            m_tagview->clear();
+            std::vector<reflexive_entity> tags;
+            for (int i = 0; i < m_model->rowCount(parent); ++i)
             {
-                painter.drawRect(tag_rect);
-                painter.drawText(tag_rect, tag, text_opt);
-                area |= tag_rect;
+                const reflexive_entity& e = m_model->at(m_model->index(i, 0, parent));
+                
+                if (e.type() == sz::entity_type::Tag)
+                { tags.emplace_back(e); }
             }
+            m_tagview->append_tags(tags);
+            
         }
-        return area;
+    }
+
+    void details_panel::refresh_items(const QModelIndex& first, const QModelIndex last, const QList<int>& roles)
+    {
+        Q_UNUSED(roles);
+        if (first.isValid() && m_items.contains(first) && first == last)
+        {
+            set_item(first);
+        }
+        // TODO
     }
 
 } // namespace rin
