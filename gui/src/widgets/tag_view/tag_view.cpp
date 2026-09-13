@@ -35,8 +35,9 @@ namespace rin
         m_model->clear(m_index_for_view_concept);
     }
 
-    void tag_view::append_tags(const std::vector<reflexive_entity> &tags)
+    void tag_view::append_tags(const std::vector<reflexive_entity>& tags)
     {
+        reset();
         m_ensure_correct_root();
         m_model->append_data(m_index_for_view_concept, tags);
     }
