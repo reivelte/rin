@@ -516,11 +516,11 @@ namespace sz
 
     sqlite::database_query entity_database::tags(const entity_database_query& query)
     {
-        bool file_query = std::filesystem::exists(query.string);
-        if (file_query)
+        constexpr const std::string_view file_uri = "file://";
+        if (query.string.starts_with(file_uri))
         {
             // copied from tags(filesytem::path)
-            return m_db.make_query("SELECT outset FROM link WHERE inset = ?", query.string);
+            return m_db.make_query("SELECT outset FROM link WHERE inset = ?", query.string.substr(file_uri.size()));
         }
         
         // tag_query
@@ -529,7 +529,6 @@ namespace sz
         q.set_sql(std::format("SELECT outset FROM ({}) f,link WHERE f.inset = link.inset", q.sql()));
         q.rebind();
         return q;
-        
     }
 
     std::vector<std::string> entity_database::tags(const std::filesystem::path& path)
