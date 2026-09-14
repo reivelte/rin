@@ -90,7 +90,9 @@ namespace rin
             qDebug() << "domain_dialog: chosen location: " << location;
             m_location_chooser->addItem(location);
             m_location_chooser->setCurrentText(location);
-            m_state_config->add_domain_location(location.toStdString());
+
+            if (m_state_config && m_state_config->available())
+            { m_state_config->add_domain_location(location.toStdString()); }
         }
     }
 

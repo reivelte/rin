@@ -87,14 +87,16 @@ namespace rin
         m_model->set_batchsize(100000); // TODO: make configurable
         m_model->set_readonly(false);
 
-        if (auto db_path = m_state_config->domain_recently_used(); sz::is_valid_domain(db_path))
+        if (m_state_config)
         {
-            m_set_database(db_path);
+            if (const auto db_path = m_state_config->domain_recently_used(); sz::is_valid_domain(db_path))
+            { m_set_database(db_path); }
+            else
+            { m_set_database(":memory:"); }
         }
         else
-        {
-            m_set_database(":memory:");
-        }
+        { m_set_database(":memory:"); }
+
         qDebug() << "main_window: using domain database: " << m_database_path;
         
         m_view = new entity_view(this);
@@ -522,7 +524,10 @@ namespace rin
     {
         m_database_path = path;
         m_model->set_database(path);
-        m_state_config->set_recently_used_domain(path);
+
+        if (m_state_config && m_state_config->available())
+        { m_state_config->set_recently_used_domain(path); }
+        
         m_set_window_title();
     }
 
