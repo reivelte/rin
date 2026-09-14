@@ -58,7 +58,7 @@ namespace sz::sqlite
     template <typename... Binds>
     concept is_bindable_pack = requires
     {
-        requires ((is_bindable<Binds> && ...) || ((std::ranges::range<Binds> && ...) && sizeof...(Binds)) == 1);
+        requires ((is_bindable<Binds> && ...) || ((std::ranges::range<Binds> && ...) && (sizeof...(Binds) == 1)));
     };
 
     namespace detail
