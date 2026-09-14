@@ -184,7 +184,8 @@ namespace sz::metadata
 
             return No_Action;
         }
-        for (std::string& tag : args.tags)
+        auto tags = args.tags;
+        for (std::string& tag : tags)
         {
             tag = std::string(sz::utility::trim(tag));
             if (!db.entity_exists(tag))
