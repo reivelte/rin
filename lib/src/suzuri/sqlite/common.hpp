@@ -55,10 +55,10 @@ namespace sz::sqlite
         requires std::constructible_from<variant, T>;
     };
 
-    template <typename... Binds, std::size_t N = sizeof...(Binds)>
+    template <typename... Binds>
     concept is_bindable_pack = requires
     {
-        requires ((is_bindable<Binds> && ...) || ((std::ranges::range<Binds> && ...) && N == 1));
+        requires ((is_bindable<Binds> && ...) || ((std::ranges::range<Binds> && ...) && sizeof...(Binds)) == 1);
     };
 
     namespace detail
