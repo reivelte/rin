@@ -65,7 +65,9 @@ namespace sz
         
         sz::result<toml::ordered_value> m_init();
         sz::result<toml::ordered_value> m_read() const;
-        void m_write(auto& data);
+
+        template <typename T>
+        void m_write(T& data);
 
         private:
         std::filesystem::path m_filepath;
@@ -168,4 +170,10 @@ namespace sz
         }
     }
 
+    template <typename T>
+    void toml_config::m_write(T& data)
+    {
+        std::ofstream out(m_filepath);
+        out << toml::format(data) << std::endl;
+    }
 } // namespace sz

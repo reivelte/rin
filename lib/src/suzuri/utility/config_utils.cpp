@@ -226,10 +226,4 @@ namespace sz
         return data.unwrap();
     }
 
-    void toml_config::m_write(auto& data)
-    {
-        std::ofstream out(m_filepath);
-        out << toml::format(data) << std::endl;
-    }
-
 } // namespace sz
