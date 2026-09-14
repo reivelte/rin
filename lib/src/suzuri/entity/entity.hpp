@@ -69,7 +69,7 @@ namespace sz
         return valid();
     }
 
-    inline constexpr uint64_t entity::index() const noexcept
+    inline constexpr entity_index entity::index() const noexcept
     {
         return m_index;
     }
