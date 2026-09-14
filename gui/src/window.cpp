@@ -52,21 +52,12 @@ namespace rin
             }
         }
 
-        if (state_config_dir_available)
+        if (state_config_dir_available) // should we assume it is writeable?
         {
             std::filesystem::path state_config_path = local_state_dir / "state.toml";
-            if (std::filesystem::exists(state_config_path))
-            {
-                qDebug() << "main_window: setting state config to: " << state_config_path;
-                // m_state_config.set_config(state_config_path, sz::config_type::State);
-                m_state_config = std::make_shared<sz::toml_config>(state_config_path, sz::config_type::State);
-            }
-            else
-            {
-                qDebug() << "main_window: could not find state config. trying to create one...";
-                // try to create it
-                // TODO
-            }
+            
+            qDebug() << "main_window: setting state config to: " << state_config_path;
+            m_state_config = std::make_shared<sz::toml_config>(state_config_path, sz::config_type::State);
             
             if (auto [w, h] = m_state_config->window_size(); w > 0 && h > 0)
             { resize(w, h); }
