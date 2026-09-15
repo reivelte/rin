@@ -98,9 +98,19 @@ namespace rin
         { m_set_database(":memory:"); }
 
         qDebug() << "main_window: using domain database: " << m_database_path;
+
+        auto viewmode = entity_view_mode::List;
+        
+        if (m_main_config && m_main_config->has_value("view.default_viewmode"))
+        {
+            if (const auto m = m_main_config->value<std::string>("view.default_viewmode"); m == "list")
+            { viewmode = entity_view_mode::List; }
+            else if (m == "icon")
+            { viewmode = entity_view_mode::Icon; }
+        }
         
         m_view = new entity_view(this);
-        m_view->set_viewmode(entity_view_mode::List);
+        m_view->set_viewmode(viewmode);
         m_view->setModel(m_model);
         
         m_lineedit = new QLineEdit;
