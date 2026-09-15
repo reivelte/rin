@@ -277,8 +277,7 @@ namespace rin
         const int item_max_width_min_spaced = item_max_width + item_min_spacing_x;
         const int num_cols = static_cast<int>(items.column_count());
         const auto [min_row_x, spacing_x] = minimum_row_x(view->viewport()->rect(), num_cols);
-        int model_index_row = info.viewitem_index_start;
-        
+
         for (int i = info.viewitem_index_start; i < info.viewitem_index_end; ++i)
         {
             const int row_idx = i / num_cols;
@@ -289,7 +288,6 @@ namespace rin
             items[i].move(x, y);
             bsp.push(items[i].rect(), i);
             rows[row_idx].count += 1;
-            ++model_index_row;
         }
     }
 
