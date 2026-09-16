@@ -22,9 +22,16 @@ namespace rin
         QModelIndex parent{};
         node_state state = node_state::Collapsed;
         int depth{}; // depth level of the tree. used to derive the x_indent for items under this node
+        int largest_item_index{}; // item in the node with the largest content width, excluding thumbnail and indentation
         bool pending_expand = false;
 
         int size() const { return static_cast<int>(items.size()); }
+        int width(int x_indent_scale, int thumb_width) const // not including auxiliary columns
+        {
+            const int indent = depth * x_indent_scale + x_indent_scale;
+            return indent + thumb_width + items[largest_item_index].index_hint();
+        }
+        
     };
 
     struct expanded_node
@@ -62,6 +69,7 @@ namespace rin
         entity_view_header* header;
         int visible_items;
         int padding_y;
+        int padding_x;
         int x_indent_scale;
 
         list_mode(entity_view* parent);
@@ -102,6 +110,8 @@ namespace rin
         int content_width_for_node(const QModelIndex& index) const;
         void recalculate_content_height(); // used when icon size is changed
         void recalculate_content_width();
+        void recalculate_node_width(const QModelIndex& parent, bool update_widths);
+        QModelIndex widest_node() const;
         std::tuple<int, int> intersecting_range(const QRect& r) const;
         
         /* templates */
@@ -137,6 +147,7 @@ namespace rin
         inline int default_item_rect_width() const;
         inline int default_item_rect_height() const;
         inline QSize approximate_content_size(size_t item_count) const;
+        inline int content_width(const QModelIndex& index) const;
     };
 
     entity_view::list_mode::list_mode(entity_view* parent)
@@ -183,6 +194,7 @@ namespace rin
         active_column = 0;
 
         padding_y = 2;
+        padding_x = 8;
     }
 
     std::vector<std::tuple<QModelIndex, int>> entity_view::list_mode::intersecting_set(const QRect& r, bool do_layout)
@@ -232,8 +244,6 @@ namespace rin
         {
             autoexpand_child_nodes(root_index);
         }
-
-        recalculate_content_width();
 
         const auto [start, end] = intersecting_range(bounds);
         return entity_view_layout_descriptor{
@@ -469,6 +479,7 @@ namespace rin
             .parent = nodes.contains(ancestor) ? ancestor : root_index,
             .state = Collapsed,
             .depth = depth,
+            .largest_item_index = -1,
             .pending_expand = false
         });
 
@@ -485,15 +496,26 @@ namespace rin
         if (nodes[index].state == Expanded)
         { return; }
         
+        const QFontMetrics f = view->fontMetrics();
         const int count = model->rowCount(index);
         const int delta = count - static_cast<int>(nodes[index].items.size());
+        
         nodes[index].items.reserve(count);
+        
+        if (count && nodes[index].largest_item_index < 0)
+        { nodes[index].largest_item_index = 0;}
 
         for (int i = static_cast<int>(nodes[index].items.size()); i < count; ++i)
         {
             if (const QModelIndex index_for_item = model->index(i, active_column, index); index_for_item.isValid())
             {
-                nodes[index].items.append(i);
+                const QString text = model->data(index_for_item, Qt::DisplayRole).toString();
+                const int item_width = padding_x + f.horizontalAdvance(text);
+
+                nodes[index].items.append(item_width);
+
+                const int lii = nodes[index].largest_item_index;
+                nodes[index].largest_item_index = item_width > nodes[index].items[lii].index_hint() ? i : lii;
 
                 if (model->hasChildren(index_for_item))
                 { create_node(index_for_item, Collapsed, nodes[index].depth + 1); }
@@ -520,7 +542,8 @@ namespace rin
         { applied_global_positions.reserve(visible_items); }
 
         nodes[index].state = Expanded;
-
+        
+        recalculate_content_width();
         emit view->expanded(index);
     }
 
@@ -599,7 +622,14 @@ namespace rin
                 if (i < c - 1)
                 { w += header->sectionSize(i); }
                 else
-                { w += view->sizeHintForColumn(i); } // last column is stretched, so get the size of its contents instead
+                {
+                    const QModelIndex aux = model->index(index.row(), i, index.parent());
+                    if (aux.isValid() || (model_is_entity_model && entity_model_ptr()->valid_index(aux)))
+                    {
+                        const int cw = content_width(aux);
+                        w += (nodes[index].depth * x_indent_scale + x_indent_scale) + item_max_thumbnail_size.width() + padding_x + cw;
+                    }
+                }
             }
         }
         else
@@ -617,7 +647,65 @@ namespace rin
 
     void entity_view::list_mode::recalculate_content_width()
     {
-        total_content_width = content_width_for_node(root_index);
+        const QModelIndex parent = widest_node();
+        
+        if (parent == QModelIndex())
+        { return; }
+        
+        total_content_width = content_width_for_node(parent);
+    }
+
+    void entity_view::list_mode::recalculate_node_width(const QModelIndex& parent, bool update_widths)
+    {
+        const QFontMetrics f = view->fontMetrics();
+        auto get_item_content_width = [&](const QModelIndex& index) -> int
+        {
+            const QString text = model->data(index, Qt::DisplayRole).toString();
+            return padding_x + f.horizontalAdvance(text);
+        };
+        
+        auto& node = nodes[parent];
+        int lii = -1;
+        if (node.items.size())
+        {
+            ++lii;
+            if (update_widths)
+            {
+                for (int i = 0; std::cmp_less(i, node.items.size()); ++i)
+                {
+                    const QModelIndex index = model->index(i, active_column, parent);
+                    const int w = get_item_content_width(index);
+                    node.items[i].set_index_hint(w);
+                    lii = w > node.items[lii].index_hint() ? i : lii;
+                }
+            }
+            else
+            {
+                for (int i = 0; std::cmp_less(i, node.items.size()); ++i)
+                {
+                    const int w = node.items[i].index_hint();
+                    lii = w > node.items[lii].index_hint() ? i : lii;
+                }
+            }
+        }
+        node.largest_item_index = lii;
+    }
+
+    QModelIndex entity_view::list_mode::widest_node() const
+    {
+        QModelIndex index;
+        int w = 0;
+        traverse_tree([&](const QModelIndex& parent) -> bool
+        {
+            const int lii = nodes[parent].largest_item_index;
+            if (const int nw = nodes[parent].items[lii].index_hint(); nw > w)
+            {
+                w = nw;
+                index = parent;
+            }
+            return false;
+        });
+        return index;
     }
 
     std::tuple<int, int> entity_view::list_mode::intersecting_range(const QRect& r) const
@@ -976,6 +1064,13 @@ namespace rin
     inline QSize entity_view::list_mode::approximate_content_size(size_t item_count) const
     {
         return QSize(view->viewport()->rect().width(), default_item_rect_height() * static_cast<int>(item_count));
+    }
+
+    // does not include padding
+    inline int entity_view::list_mode::content_width(const QModelIndex& index) const
+    {
+        const QFontMetrics f = view->fontMetrics();
+        return f.horizontalAdvance(model->data(index, Qt::DisplayRole).toString());
     }
 
 } // namespace rin

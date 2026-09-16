@@ -333,20 +333,30 @@ namespace rin
         if (viewmode() == entity_view_mode::List)
         {
             auto* lv = m->as<list_mode*>();
-            const auto f = fontMetrics();
             const int thumb_width = m->item_max_thumbnail_size.width();
-            lv->traverse_tree([&](const QModelIndex& parent, int gstart, int lstart, int range) -> bool
+
+            if (column == lv->active_column)
             {
-                Q_UNUSED(gstart);
-                for (int i = lstart; i <= (lstart + range); ++i)
+                lv->traverse_tree([&](const QModelIndex& parent) -> bool
                 {
-                    const QModelIndex index = m->model->index(i, column, parent);
-                    const QString text = m->model->data(index, Qt::DisplayRole).toString();
-                    const int indent = column == 0 ? lv->nodes[parent].depth * lv->x_indent_scale + lv->x_indent_scale : 0;
-                    width = std::max(width, indent + thumb_width + 8 + f.horizontalAdvance(text)); // TODO: remove hardcoded values
-                }
-                return false;
-            });
+                    width = std::max(width, lv->nodes[parent].width(lv->x_indent_scale, thumb_width));
+                    return false;
+                });
+            }
+            else
+            {
+                const QFontMetrics f = fontMetrics();
+                lv->traverse_tree([&](const QModelIndex& parent, int gstart, int lstart, int range) -> bool
+                {
+                    Q_UNUSED(gstart);
+                    for (int i = lstart; i <= (lstart + range); ++i)
+                    {
+                        const int cw = f.horizontalAdvance(lv->model->data(m->model->index(i, column, parent), Qt::DisplayRole).toString());
+                        width = std::max(width, lv->padding_x + cw);
+                    }
+                    return false;
+                });
+            }
         }
         return width;
     }
@@ -1133,6 +1143,13 @@ namespace rin
                 const int amount_removed = (end - start) + 1;
                 m->view_loaded_items -= amount_removed;
                 m->total_content_height -= amount_removed * lv->default_item_rect_height();
+
+                if (const int lii = lv->nodes[parent].largest_item_index; (start <= lii) && (lii <= end))
+                {
+                    lv->recalculate_node_width(parent, false);
+                    lv->recalculate_content_width();
+                }
+
                 lv->clear_layout_data();
             }
         }
@@ -1206,6 +1223,7 @@ namespace rin
         {
             auto* lv = m->as<list_mode*>();
             lv->clear_layout_data();
+            lv->recalculate_content_width();
             scheduleDelayedItemsLayout();
         }
     }
