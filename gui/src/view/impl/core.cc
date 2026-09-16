@@ -113,7 +113,7 @@ namespace rin
         inline bool indexes_are_enabled(const R& indexes);
 
         /* inline functions */
-        inline entity_model* entity_model_ptr();
+        inline entity_model* entity_model_ptr() const;
         inline void clear_persistent_selected_indexes();
         inline QSize item_size_from_model(const QModelIndex& parent, int col, int row) const;
         inline void schedule_delayed_repaint(int delay);
@@ -266,7 +266,7 @@ namespace rin
         return true;
     }
 
-    inline entity_model* entity_view::impl::entity_model_ptr()
+    inline entity_model* entity_view::impl::entity_model_ptr() const
     {
         if (!model_is_entity_model)
         { qWarning() << "entity_view: tried to interpret assigned model as an entity_model when it is not"; }
