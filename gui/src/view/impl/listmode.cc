@@ -434,12 +434,15 @@ namespace rin
     void entity_view::list_mode::resize_column_to_contents(int col)
     {
         // see qtreeview.cpp line 2658
-        if (col < 0 || col >= header->count())
-        { return; }
+        if (header)
+        {
+            if (col < 0 || col >= header->count())
+            { return; }
 
-        int contents = view->sizeHintForColumn(col);
-        int head = header->isHidden() ? 0 : header->sectionSizeHint(col);
-        header->resizeSection(col, std::max(contents, head));
+            int contents = view->sizeHintForColumn(col);
+            int head = header->isHidden() ? 0 : header->sectionSizeHint(col);
+            header->resizeSection(col, std::max(contents, head));
+        }
     }
 
     bool entity_view::list_mode::try_create_node(const QModelIndex& index, const int depth)
