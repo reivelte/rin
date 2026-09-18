@@ -33,7 +33,7 @@ set(SOURCES #!BEGIN: SOURCE LIST
   src/widgets/tag_view/tag_view.cpp
   src/widgets/dialogs/domain.cpp
   src/widgets/dialogs/sidecar.cpp
-  src/widgets/dialogs/settings.cpp
+  src/widgets/dialogs/settings/settings.cpp
   src/window.hpp
   src/rin.hpp
   src/utility/bsp.hpp
@@ -60,7 +60,7 @@ set(SOURCES #!BEGIN: SOURCE LIST
   src/widgets/tag_view/tag_view.hpp
   src/widgets/dialogs/domain.hpp
   src/widgets/dialogs/sidecar.hpp
-  src/widgets/dialogs/settings.hpp
+  src/widgets/dialogs/settings/settings.hpp
 ) #!END: SOURCE LIST
 
 add_executable(${PROJECT_NAME})
