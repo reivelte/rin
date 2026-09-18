@@ -122,6 +122,11 @@ namespace rin
     void entity_view::set_item_alignment(entity_view_item_visual_align align)
     {
         m->item_alignment_in_row = align;
+        if (viewmode() == entity_view_mode::Icon)
+        {
+            auto* iv = m->as<icon_mode*>();
+            iv->bsp.clear();
+        }
         scheduleDelayedItemsLayout();
     }
 

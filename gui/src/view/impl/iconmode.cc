@@ -37,6 +37,7 @@ namespace rin
         /* inline functions */
         inline int default_row_width(int num_cols, int spacing_x) const;
         inline std::tuple<int, int> minimum_row_x(const QRect& r, int num_cols) const; // also returns the spacing_x used to derive the minimum
+        inline void init_bsp(binary_space_partition<int>& x, const QRect& vp, size_t n);
         inline void init_trees(const QRect& vp, size_t n);
         inline int items_per_row() const;
         inline QSize approximate_content_size(size_t item_count) const;
@@ -79,7 +80,7 @@ namespace rin
         show_elasticband = true;
         active_column = 0;
 
-        item_alignment_in_row = entity_view_item_visual_align::Center;
+        item_alignment_in_row = entity_view_item_visual_align::Top;
     }
 
     std::vector<std::tuple<QModelIndex, int>> entity_view::icon_mode::intersecting_set(const QRect& r, bool do_layout)
@@ -163,6 +164,9 @@ namespace rin
             
             if (row_end > 0)
             {
+                if (!bsp.initialized())
+                { init_bsp(bsp, vp, count); }
+
                 const int item_end = std::min(static_cast<int>(rows[row_end - 1].index + items.column_count()), count);
                 int item_start = static_cast<int>(rows[row_start].index);
 
@@ -191,9 +195,27 @@ namespace rin
             const int row_idx = i / num_cols;
             const int col_idx = i - (row_idx * num_cols);
             const int x = min_row_x + (item_max_width_min_spaced + spacing_x) * col_idx;
-            const int y = rows[row_idx].rect.top(); // TODO, row alignment
-
+            const int y = rows[row_idx].rect.top();
             items[i].move(x, y);
+
+            switch (item_alignment_in_row)
+            {
+            case entity_view_item_visual_align::Top:
+            { break; }
+            case entity_view_item_visual_align::Center:
+            {
+                const int dy = items[i].rect().center().y() - rows[row_idx].rect.center().y();
+                items[i].move(x, y - dy);
+                break;
+            }
+            case entity_view_item_visual_align::Bottom:
+            {
+                items[i].move(x, rows[row_idx].rect.bottom() - items[i].height());
+                break;
+            }
+            default: { break; }
+            }
+
             bsp.push(items[i].rect(), i);
             rows[row_idx].count += 1;
         }
@@ -248,12 +270,16 @@ namespace rin
         return { min_row_x, spacing_x };
     }
 
+    inline void entity_view::icon_mode::init_bsp(binary_space_partition<int>& x, const QRect& vp, size_t n)
+    {
+        x.create(n);
+        x.init(vp | QRect(QPoint(), approximate_content_size(n)), bsp_node_type::X_Plane);
+    }
+
     inline void entity_view::icon_mode::init_trees(const QRect& vp, size_t n)
     {
-        bsp.create(n);
-        bsp.init(vp | QRect(QPoint(), approximate_content_size(n)), bsp_node_type::X_Plane);
-        bsp_rows.create(n);
-        bsp_rows.init(vp | QRect(QPoint(), approximate_content_size(n)), bsp_node_type::X_Plane);
+        init_bsp(bsp, vp, n);
+        init_bsp(bsp_rows, vp, n);
     }
 
     inline int entity_view::icon_mode::items_per_row() const
