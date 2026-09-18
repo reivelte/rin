@@ -43,9 +43,7 @@ namespace rin
         inline int row_count_for_item_count(int item_count, int column_count) const;
 
         std::set<int> intersecting_rows(const QRect& r);
-        void do_layout(const entity_view_layout_descriptor& info);
-        void do_row_layout();
-        void do_lazy_layout(int row_start, int row_end);
+        void do_row_layout(const QRect& r, const int num_cols, const int num_rows);
     };
 
     entity_view::icon_mode::icon_mode(entity_view* parent)
@@ -99,83 +97,105 @@ namespace rin
 
     entity_view_layout_descriptor entity_view::icon_mode::prepare_item_layout()
     {
+        const QRect vp = view->viewport()->rect();
+        const int count = model->rowCount(root_index);
+        
         if (rows.empty() || std::cmp_not_equal(items.column_count(), items_per_row()))
         {
-            const QRect vp = view->viewport()->rect();
-            // const int batch_size = layout_batch_size; // TODO: batch size should apply in do_row_layout()
-            const int modelsize = model->rowCount(root_index);
             const int num_cols = std::max((vp.width() / (item_max_width + item_min_spacing_x)), 1);
-            const int num_rows_of_items = qCeil(static_cast<qreal>(modelsize) / static_cast<qreal>(num_cols));
+            const int num_rows = row_count_for_item_count(count, num_cols);
 
             items.set_column_count(num_cols);
             rows.clear();
-            rows.resize(num_rows_of_items);
-            items.resize(num_rows_of_items);
+            rows.resize(num_rows);
+            items.resize(num_rows);
             bsp.clear();
             bsp_rows.clear();
-            init_trees(vp, modelsize);
-
-            // TODO: lots of duplicated code here
+            init_trees(vp, count);
             total_content_height = row_spacing_y;
+
+            auto adjust_content_height = [&](QSize s, int height, int idx, int col) -> int
+            {
+                height = std::max(height, s.height());
+                if ((col == num_cols - 1) || (idx == count - 1))
+                {
+                    total_content_height += (height + row_spacing_y);
+                    rows[idx / num_cols].height = height;
+                    height = 0;
+                }
+                return height;
+            };
+
             int h = 0;
             if (!item_sizes_initialized)
             {
-                for (int i = 0; i < modelsize; ++i)
+                for (int i = 0; i < count; ++i)
                 {
-                    const int col = i % num_cols;
-                    QSize s;
-                    if (items[i].size().isNull())
-                    {
-                        s = item_size_from_model(root_index, active_column, i);
-                        items[i].resize(s);
-                        items[i].set_index_hint(i);
-                        ++view_loaded_items;
-                    }
-                    else
-                    { s = items[i].size(); }
-                    
-                    h = s.height() > h ? s.height() : h;
-                    
-                    if ((col == num_cols - 1) || (i == modelsize - 1))
-                    {
-                        total_content_height += (h + row_spacing_y);
-                        rows[i / num_cols].height = h;
-                        h = 0;
-                    }
+                    items[i].resize(item_size_from_model(root_index, active_column, i));
+                    h = adjust_content_height(items[i].size(), h, i, i % num_cols);
                 }
+                view_loaded_items = count;
                 item_sizes_initialized = true;
             }
             else // a resize event occured
             {
-                for (int i = 0; i < modelsize; ++i)
-                {
-                    const int col = i % num_cols;
-                    const QSize s = items[i].size();
-                    h = s.height() > h ? s.height() : h;
-                    if ((col == num_cols - 1) || (i == modelsize - 1))
-                    {
-                        total_content_height += (h + row_spacing_y);
-                        rows[i / num_cols].height = h;
-                        h = 0;
-                    }
-                }
+                for (int i = 0; i < count; ++i)
+                { h = adjust_content_height(items[i].size(), h, i, i % num_cols); }
             }
-            do_row_layout();
+
+            do_row_layout(vp, num_cols, num_rows);
         } // if (rows.empty() || std::cmp_not_equal(items.column_count(), items_per_row()))
+
+        entity_view_layout_descriptor desc{
+            .model_indexes{},
+            .parent = root_index,
+            .bounding_rect = vp.translated(offset()),
+            .position = 0,
+            .y_hint = row_spacing_y,
+            .viewitem_index_start = 0,
+            .viewitem_index_end = 0
+        };
+
+        if (const std::set<int> intersecting = intersecting_rows(desc.bounding_rect); intersecting.size())
+        {
+            const int row_start = std::max(*intersecting.begin() - 5, 0);
+            const int row_end = std::min(*intersecting.rbegin() + 6, static_cast<int>(rows.size()));
+            
+            if (row_end > 0)
+            {
+                const int item_end = std::min(static_cast<int>(rows[row_end - 1].index + items.column_count()), count);
+                int item_start = static_cast<int>(rows[row_start].index);
+
+                while (bsp.contains(item_start) && item_start < item_end)
+                { ++item_start; }
+
+                desc.viewitem_index_start = item_start;
+                desc.viewitem_index_end = item_end;
+            }
+        }
         
-        return entity_view_layout_descriptor();
+        return desc;
     }
     
     // TODO: switch to auto horizontal scrolling if max_item_width > r.width
     bool entity_view::icon_mode::do_item_layout(const entity_view_layout_descriptor& info)
     {
-        Q_UNUSED(info);
-        
-        const std::set<int> intersecting = intersecting_rows(view->viewport()->rect().translated(offset()));
-        if (intersecting.size())
+        const int start = info.viewitem_index_start;
+        const int end = info.viewitem_index_end;
+        const int item_max_width_min_spaced = item_max_width + item_min_spacing_x;
+        const int num_cols = static_cast<int>(items.column_count());
+        const auto [min_row_x, spacing_x] = minimum_row_x(view->viewport()->rect(), num_cols);
+
+        for (int i = start; i < end; ++i)
         {
-            const int last = *intersecting.rbegin();
-            do_lazy_layout(*intersecting.begin(), last);
+            const int row_idx = i / num_cols;
+            const int col_idx = i - (row_idx * num_cols);
+            const int x = min_row_x + (item_max_width_min_spaced + spacing_x) * col_idx;
+            const int y = rows[row_idx].rect.top(); // TODO, row alignment
+
+            items[i].move(x, y);
+            bsp.push(items[i].rect(), i);
+            rows[row_idx].count += 1;
         }
         return true;
     }
@@ -272,30 +292,8 @@ namespace rin
         return indexes;
     }
 
-    void entity_view::icon_mode::do_layout(const entity_view_layout_descriptor& info)
+    void entity_view::icon_mode::do_row_layout(const QRect& r, const int num_cols, const int num_rows)
     {
-        const int item_max_width_min_spaced = item_max_width + item_min_spacing_x;
-        const int num_cols = static_cast<int>(items.column_count());
-        const auto [min_row_x, spacing_x] = minimum_row_x(view->viewport()->rect(), num_cols);
-
-        for (int i = info.viewitem_index_start; i < info.viewitem_index_end; ++i)
-        {
-            const int row_idx = i / num_cols;
-            const int col_idx = i - (row_idx * num_cols);
-            const int x = min_row_x + (item_max_width_min_spaced + spacing_x) * col_idx;
-            const int y = rows[row_idx].rect.top(); // TODO, row alignment
-
-            items[i].move(x, y);
-            bsp.push(items[i].rect(), i);
-            rows[row_idx].count += 1;
-        }
-    }
-
-    void entity_view::icon_mode::do_row_layout()
-    {
-        const QRect r = view->viewport()->rect();
-        const int num_cols = static_cast<int>(items.column_count());
-        const int num_rows = row_count_for_item_count(model->rowCount(root_index), num_cols);
         const auto [min_row_x, spacing_x] = minimum_row_x(r, num_cols);
         const int min_row_y = r.top() + row_spacing_y;
         const int row_width = default_row_width(num_cols, spacing_x);
@@ -310,35 +308,6 @@ namespace rin
             bsp_rows.push(rows[i].rect, i);
             y += rows[i].height + row_spacing_y;
         }
-    }
-
-    void entity_view::icon_mode::do_lazy_layout(int row_start, int row_end)
-    {
-        row_start = std::max(row_start - 5, 0);
-        row_end = std::min(row_end + 6, static_cast<int>(rows.size()));
-
-        if (row_end == 0)
-        { return; }
-
-        const int item_end = std::min(static_cast<int>(rows[row_end - 1].index + items.column_count()), model->rowCount(root_index));
-        int item_start = static_cast<int>(rows[row_start].index);
-
-        while (bsp.contains(item_start) && item_start < item_end)
-        { ++item_start; }
-
-        if (item_start == item_end)
-        { return; } // nothing to do
-
-        entity_view_layout_descriptor desc{
-            .model_indexes{}, // the range is always the same as start,end. (every item has the same parent and is in the same column)
-            .parent = root_index,
-            .bounding_rect = QRect(),
-            .position = 0,
-            .y_hint = rows[static_cast<size_t>(item_start) / items.column_count()].rect.top(),
-            .viewitem_index_start = item_start,
-            .viewitem_index_end = item_end
-        };
-        do_layout(desc);
     }
 
 } // namespace rin
