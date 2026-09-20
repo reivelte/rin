@@ -33,7 +33,11 @@ set(SOURCES #!BEGIN: SOURCE LIST
   src/widgets/tag_view/tag_view.cpp
   src/widgets/dialogs/domain.cpp
   src/widgets/dialogs/sidecar.cpp
-  src/widgets/dialogs/settings/settings.cpp
+  src/widgets/dialogs/settings/general_form.cpp
+  src/widgets/dialogs/settings/form.cpp
+  src/widgets/dialogs/settings/dialog.cpp
+  src/widgets/dialogs/settings/view_form.cpp
+  src/widgets/dialogs/settings/navigation_form.cpp
   src/window.hpp
   src/rin.hpp
   src/utility/bsp.hpp
@@ -60,7 +64,11 @@ set(SOURCES #!BEGIN: SOURCE LIST
   src/widgets/tag_view/tag_view.hpp
   src/widgets/dialogs/domain.hpp
   src/widgets/dialogs/sidecar.hpp
-  src/widgets/dialogs/settings/settings.hpp
+  src/widgets/dialogs/settings/form.hpp
+  src/widgets/dialogs/settings/general_form.hpp
+  src/widgets/dialogs/settings/dialog.hpp
+  src/widgets/dialogs/settings/navigation_form.hpp
+  src/widgets/dialogs/settings/view_form.hpp
 ) #!END: SOURCE LIST
 
 add_executable(${PROJECT_NAME})

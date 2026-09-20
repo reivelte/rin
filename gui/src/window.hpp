@@ -10,7 +10,7 @@
 #include <QtGui/QKeySequence>
 #include <suzuri/utility/config_utils.hpp>
 #include "tagger/tagger.hpp"
-#include "widgets/dialogs/settings/settings.hpp"
+#include "widgets/dialogs/settings/dialog.hpp"
 #include "widgets/details_panel.hpp"
 #include "model/entitymodel.hpp"
 

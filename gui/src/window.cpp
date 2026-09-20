@@ -27,6 +27,7 @@
 #include "widgets/tag_view/tag_view.hpp"
 #include "widgets/iconsizer.hpp"
 #include "widgets/dialogs/domain.hpp"
+#include "widgets/dialogs/settings/navigation_form.hpp"
 
 namespace rin
 {
