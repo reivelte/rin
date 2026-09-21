@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
-
 #include "view_form.hpp"
 
 namespace rin
@@ -18,6 +17,11 @@ namespace rin
 
     view_settings_form::~view_settings_form()
     {
+    }
+
+    bool view_settings_form::can_apply_settings() const
+    {
+        return false;
     }
 
     void view_settings_form::commit()

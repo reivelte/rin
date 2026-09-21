@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: (c) rin contributors
+//
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QFileDialog>
 #include "navigation_form.hpp"

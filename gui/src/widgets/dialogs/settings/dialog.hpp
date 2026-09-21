@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: (c) rin contributors
+//
+// SPDX-License-Identifier: GPL-3.0-only
+
 #pragma once
 
 #include <memory>
@@ -15,10 +19,7 @@
 
 namespace rin
 {
-    class navigation_panel_settings_form;
-    class general_settings_form;
-    class view_settings_form;
-
+    class settings_form;
     class settings_dialog : public QDialog
     {
         Q_OBJECT
@@ -27,8 +28,7 @@ namespace rin
         settings_dialog(const std::shared_ptr<sz::toml_config>& config, QWidget* parent);
         ~settings_dialog();
 
-        general_settings_form* general_settings_page() const { return m_general_settings; }
-        navigation_panel_settings_form* navigation_settings_page() const { return m_navpanel_settings; }
+        settings_form* page(const QString& name) const;
 
         signals:
         void settings_applied();
@@ -42,17 +42,15 @@ namespace rin
         void handle_button_click(QAbstractButton* button);
 
         private:
+        void m_add_form(const QString& name, settings_form* form);
+
+        private:
         std::shared_ptr<sz::toml_config> m_config;
-        // QHBoxLayout* m_hbox;
-
-        general_settings_form* m_general_settings;
-        navigation_panel_settings_form* m_navpanel_settings;
-        view_settings_form* m_view_settings;
-
-        QSplitter* m_hsplit;
-        QVBoxLayout* m_vbox;
+        std::unordered_map<QString, settings_form*> m_forms;
         QListWidget* m_menulist;
         QStackedWidget* m_pages;
+        QSplitter* m_hsplit;
+        QVBoxLayout* m_vbox;
         QDialogButtonBox* m_button_box;
         QPushButton* m_apply_button;
 

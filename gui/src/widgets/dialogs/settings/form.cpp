@@ -10,6 +10,5 @@ namespace rin
     settings_form::settings_form(settings_dialog* parent) :
         QFrame(parent)
     {
-        connect(parent, &settings_dialog::settings_applied, this, &settings_form::commit);
     }
 } // namespace rin

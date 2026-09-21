@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: (c) rin contributors
+//
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include "dialog.hpp"
 #include "general_form.hpp"
 #include "navigation_form.hpp"
@@ -9,17 +13,11 @@ namespace rin
     : QDialog(parent), m_config(config)
     {
         m_menulist = new QListWidget(this);
-        m_menulist->addItem("General");
-        m_menulist->addItem(tr("Navigation"));
-        
         m_pages = new QStackedWidget(this);
-
-        m_general_settings = new general_settings_form(config, this);
-        m_navpanel_settings = new navigation_panel_settings_form(config, this);
-        m_view_settings = new view_settings_form(config, this);
-        m_pages->addWidget(m_general_settings);
-        m_pages->addWidget(m_navpanel_settings);
-        m_pages->addWidget(m_view_settings);
+        
+        m_add_form(tr("General"), new general_settings_form(config, this));
+        m_add_form(tr("Navigation"), new navigation_panel_settings_form(config, this));
+        m_add_form(tr("View"), new view_settings_form(config, this));
 
         // buttons
         m_button_box = new QDialogButtonBox(
@@ -48,37 +46,29 @@ namespace rin
     {
     }
 
-    void settings_dialog::change_page(QListWidgetItem* page_name_widget)
+    settings_form* settings_dialog::page(const QString& name) const
     {
-        auto text = page_name_widget->text();
-        qDebug() << "[settings dialog] change page to: " << text;
+        if (m_forms.contains(name))
+        { return m_forms.at(name); }
 
-        // TODO: we should store enums inside the list items instead of comparing strings
-        if (text == "General")
-        {
-            m_pages->setCurrentWidget(m_general_settings);
-        }
-        else if (text == "Navigation")
-        {
-            m_pages->setCurrentWidget(m_navpanel_settings);
-        }
+        return nullptr;
+    }
+
+    void settings_dialog::change_page(QListWidgetItem* item)
+    {
+        if (const QString name = item->text(); m_forms.contains(name))
+        { m_pages->setCurrentWidget(m_forms[name]); }
     }
 
     bool settings_dialog::apply_settings()
     {
-        if (m_pages->currentWidget() == m_general_settings)
+        if (auto* form = qobject_cast<settings_form*>(m_pages->currentWidget()); form->can_apply_settings())
         {
-            if (!m_general_settings->can_apply_settings())
-            { return false; }
+            form->commit();
+            emit settings_applied();
+            return true;
         }
-        else if (m_pages->currentWidget() == m_navpanel_settings)
-        {   
-            if (!m_navpanel_settings->can_apply_settings())
-            { return false; }
-        }
-        qDebug() << "[settings dialog] apply settings";
-        emit settings_applied();
-        return true;
+        return false;
     }
 
     void settings_dialog::apply_settings_and_accept()
@@ -87,6 +77,13 @@ namespace rin
         {
             accept();
         }
+    }
+
+    void settings_dialog::m_add_form(const QString& name, settings_form* form)
+    {
+        m_menulist->addItem(name);
+        m_pages->addWidget(form);
+        m_forms.emplace(name, form);
     }
 
     void settings_dialog::handle_button_click(QAbstractButton* button)

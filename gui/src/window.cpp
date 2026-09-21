@@ -441,11 +441,8 @@ namespace rin
         { delete m_settings_dialog; }
 
         m_settings_dialog = new settings_dialog(m_main_config, this);
-        connect(
-            m_settings_dialog->navigation_settings_page(), 
-            &navigation_panel_settings_form::new_navigation_panel_targets_applied, 
-            this, &main_window::reset_navigation_panel
-        );
+        auto* nav_settings_form = qobject_cast<navigation_panel_settings_form*>(m_settings_dialog->page("Navigation"));
+        connect(nav_settings_form, &navigation_panel_settings_form::new_navigation_panel_targets_applied, this, &main_window::reset_navigation_panel);
         m_settings_dialog->show();
     }
 

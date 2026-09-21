@@ -17,6 +17,8 @@ namespace rin
         public:
         view_settings_form(const std::shared_ptr<sz::toml_config>& config, settings_dialog* parent);
         ~view_settings_form();
+
+        bool can_apply_settings() const override;
         
         public:
         void commit() override;

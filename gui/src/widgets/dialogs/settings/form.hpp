@@ -20,6 +20,8 @@ namespace rin
         settings_form(settings_dialog* parent);
         ~settings_form() = default;
 
+        virtual bool can_apply_settings() const = 0;
+
         public slots:
         virtual void commit() = 0;
     };

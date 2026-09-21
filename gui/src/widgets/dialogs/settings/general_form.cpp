@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: (c) rin contributors
+//
+// SPDX-License-Identifier: GPL-3.0-only
+
 #include <QtCore/QFileInfo>
 #include "general_form.hpp"
 

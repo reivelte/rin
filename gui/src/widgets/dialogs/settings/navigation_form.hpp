@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: (c) rin contributors
+//
+// SPDX-License-Identifier: GPL-3.0-only
+
 #pragma once
 
 #include <QtCore/QList>
@@ -20,7 +24,7 @@ namespace rin
 
         QList<QFileInfo> targets();
 
-        bool can_apply_settings() const;
+        bool can_apply_settings() const override;
 
         signals:
         void new_navigation_panel_targets_applied();

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: (c) rin contributors
+//
+// SPDX-License-Identifier: GPL-3.0-only
+
 #pragma once
 
 #include <QtWidgets/QLineEdit>
@@ -14,7 +18,7 @@ namespace rin
         general_settings_form(const std::shared_ptr<sz::toml_config>& config, settings_dialog* parent);
         ~general_settings_form();
 
-        bool can_apply_settings() const;
+        bool can_apply_settings() const override;
 
         public slots:
         void commit() override;
