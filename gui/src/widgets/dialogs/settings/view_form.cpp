@@ -11,6 +11,7 @@ namespace rin
     {
         m_form_layout = new QFormLayout(this);
         m_visual_align_chooser = new QComboBox(this);
+        m_visual_align_chooser->addItems({"Top", "Center", "Bottom"});
 
         m_form_layout->addRow("Item Row Alignment", m_visual_align_chooser);
     }
@@ -21,12 +22,13 @@ namespace rin
 
     bool view_settings_form::can_apply_settings() const
     {
-        return false;
+        return true;
     }
 
     void view_settings_form::commit()
     {
-        qDebug() << "visual settings: commit()";
+        const auto value = m_visual_align_chooser->currentText().toLower().toStdString();
+        m_config->set_value("view.item_row_alignment", value);
     }
 
 } // namespace rin
