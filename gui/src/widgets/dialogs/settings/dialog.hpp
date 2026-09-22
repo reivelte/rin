@@ -29,6 +29,8 @@ namespace rin
         ~settings_dialog();
 
         settings_form* page(const QString& name) const;
+        settings_form* current_page() const;
+        QString current_page_name() const;
 
         signals:
         void settings_applied();
@@ -47,6 +49,7 @@ namespace rin
         private:
         std::shared_ptr<sz::toml_config> m_config;
         std::unordered_map<QString, settings_form*> m_forms;
+        QString m_current_page;
         QListWidget* m_menulist;
         QStackedWidget* m_pages;
         QSplitter* m_hsplit;

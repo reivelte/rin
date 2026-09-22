@@ -19,6 +19,8 @@ namespace rin
         m_add_form(tr("Navigation"), new navigation_panel_settings_form(config, this));
         m_add_form(tr("View"), new view_settings_form(config, this));
 
+        m_current_page = "General";
+
         // buttons
         m_button_box = new QDialogButtonBox(
             QDialogButtonBox::StandardButton::Cancel | QDialogButtonBox::StandardButton::Ok,
@@ -54,10 +56,23 @@ namespace rin
         return nullptr;
     }
 
+    settings_form* settings_dialog::current_page() const
+    {
+        return qobject_cast<settings_form*>(m_pages->currentWidget());
+    }
+
+    QString settings_dialog::current_page_name() const
+    {
+        return m_current_page;
+    }
+
     void settings_dialog::change_page(QListWidgetItem* item)
     {
         if (const QString name = item->text(); m_forms.contains(name))
-        { m_pages->setCurrentWidget(m_forms[name]); }
+        {
+            m_pages->setCurrentWidget(m_forms[name]);
+            m_current_page = name;
+        }
     }
 
     bool settings_dialog::apply_settings()
