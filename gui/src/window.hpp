@@ -103,6 +103,7 @@ namespace rin
         void m_set_window_title();
         void m_set_database(const std::filesystem::path& path);
         void m_set_root(const QModelIndex& index);
+        void m_set_view_item_alignment(const std::string& value);
         QString m_make_view_stats_status_message(uintmax_t size, size_t dir_count, size_t file_count, size_t tag_count);
         void m_update_view_stats(const entity_model::item_properties& props);
         void m_create_menubar();

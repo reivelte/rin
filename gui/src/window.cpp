@@ -28,6 +28,7 @@
 #include "widgets/iconsizer.hpp"
 #include "widgets/dialogs/domain.hpp"
 #include "widgets/dialogs/settings/navigation_form.hpp"
+#include "widgets/dialogs/settings/view_form.hpp"
 
 namespace rin
 {
@@ -172,6 +173,10 @@ namespace rin
         m_status_bar->addPermanentWidget(m_listmode_toggle);
         m_status_bar->addPermanentWidget(m_icon_sizer);
 
+        if (m_main_config && m_main_config->has_value("view.item_row_alignment"))
+        {
+            m_set_view_item_alignment(m_main_config->value<std::string>("view.item_row_alignment"));
+        }
         setCentralWidget(m_view);
 
         connect(m_lineedit, &QLineEdit::returnPressed, this, &main_window::read_input);
@@ -436,13 +441,23 @@ namespace rin
 
     void main_window::open_settings()
     {
-        qDebug() << "rin settings";
         if (m_settings_dialog)
         { delete m_settings_dialog; }
 
         m_settings_dialog = new settings_dialog(m_main_config, this);
-        auto* nav_settings_form = qobject_cast<navigation_panel_settings_form*>(m_settings_dialog->page("Navigation"));
-        connect(nav_settings_form, &navigation_panel_settings_form::new_navigation_panel_targets_applied, this, &main_window::reset_navigation_panel);
+
+        connect(m_settings_dialog, &settings_dialog::settings_applied, this, [&]() -> void
+        {
+            if (const QString name = m_settings_dialog->current_page_name(); name == "View")
+            {
+                m_set_view_item_alignment(m_main_config->value<std::string>("view.item_row_alignment"));
+            }
+            else if (name == "Navigation")
+            {
+                reset_navigation_panel();
+            }
+        });
+        
         m_settings_dialog->show();
     }
 
@@ -544,6 +559,19 @@ namespace rin
         m_view->setRootIndex(index);
         m_lineedit->setText(m_model->id_for_index(index));
         update_status_view_counts(QModelIndex());
+    }
+
+    void main_window::m_set_view_item_alignment(const std::string& value)
+    {
+        using enum entity_view_item_visual_align;
+        auto align = Top;
+            
+        if (value == "center")
+        { align = Center; }
+        else if (value == "bottom")
+        { align = Bottom; }
+
+        m_view->set_item_alignment(align);
     }
 
     QString main_window::m_make_view_stats_status_message(uintmax_t size, size_t dir_count, size_t file_count, size_t tag_count)
