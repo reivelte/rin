@@ -98,6 +98,17 @@ namespace rin
         { scheduleDelayedItemsLayout(); }
     }
 
+    void entity_view::set_item_layout_mode(entity_view_item_layout_mode mode)
+    {
+        if (viewmode() == entity_view_mode::Icon)
+        {
+            auto* iv = m->as<icon_mode*>();
+            iv->layout_mode = mode;
+            iv->clear();
+            scheduleDelayedItemsLayout();
+        }
+    }
+
     void entity_view::set_iconsize(const QSize& size)
     {
         if (size == iconSize())
@@ -158,6 +169,15 @@ namespace rin
         }
     }
 
+    void entity_view::set_font_size(int pt)
+    {
+        QFont f = font();
+        f.setPointSize(pt);
+        setFont(f);
+        m->clear();
+        scheduleDelayedItemsLayout();
+    }
+
     entity_view_mode entity_view::viewmode() const
     {
         return m->current_viewmode;
@@ -171,6 +191,11 @@ namespace rin
             return lv->header;
         }
         return nullptr;
+    }
+
+    entity_view_item_delegate* entity_view::item_delegate() const
+    {
+        return qobject_cast<entity_view_item_delegate*>(itemDelegateForIndex(m->root_index));
     }
 
     QList<QModelIndex> entity_view::selected_indexes() const

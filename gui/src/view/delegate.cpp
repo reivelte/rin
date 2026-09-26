@@ -13,13 +13,24 @@
 
 namespace rin
 {
-    entity_view_item_delegate::entity_view_item_delegate(QObject* parent)
-    : QStyledItemDelegate(parent), m_view(qobject_cast<const entity_view*>(parent))
+    entity_view_item_delegate::entity_view_item_delegate(QObject* parent) :
+        QStyledItemDelegate(parent), m_view(qobject_cast<const entity_view*>(parent)),
+        m_fixed_width(true), m_accurate_size_hints(false)
     {
         if (m_view == nullptr)
         {
             throw std::runtime_error("view was nullptr");
         }
+    }
+
+    void entity_view_item_delegate::set_fixed_width(bool fixed)
+    {
+        m_fixed_width = fixed;
+    }
+
+    void entity_view_item_delegate::set_accurate_size_hints(bool on)
+    {
+        m_accurate_size_hints = on;
     }
 
     QRegion entity_view_item_delegate::interactive_region(const QStyleOptionViewItem& option, const QModelIndex& index) const
@@ -31,7 +42,7 @@ namespace rin
 
         QRegion region;
         QTextLayout name_layout(opt.text);
-        const QSize name_layout_size = m_layout_text(name_layout, opt);
+        const QSize name_layout_size = m_layout_text(name_layout, opt, opt.rect.width());
         const QRect thumb_rect = m_thumbnail_rect(opt.rect, thumbnail_size(m_view->iconSize(), index));
         const QRect name_rect = m_name_rect(opt.rect, thumb_rect, name_layout_size);
         if (mode == Icon)
@@ -83,7 +94,7 @@ namespace rin
             else
             { name_layout.setText(opt.text); }
 
-            const QSize name_layout_size = m_layout_text(name_layout, opt);
+            const QSize name_layout_size = m_layout_text(name_layout, opt, opt.rect.width());
             name_rect = m_name_rect(opt.rect, thumb_rect, name_layout_size);
 
             painter->setPen(opt.palette.color(cg, is_selected ? QPalette::HighlightedText : QPalette::Text));
@@ -120,9 +131,7 @@ namespace rin
         }
     }
 
-    // 2025/02/04: the view no longer relies on this when doing a layout, but it may still be useful
-    // the width stays fixed to the value set in the view, if an entity_view requests a sizeHint, the width returned here won't matter
-    // it is basically a glorified "heightForWidth()" function
+    // some entity_view view modes treat this function as a glorified "heightForWidth()" function
     // entity_view provides a rect as an initial value (based on the max thumbnail size set in the view)
     // there is a chance that all data required to display the item is not available yet (namely thumbnails)
     QSize entity_view_item_delegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
@@ -138,10 +147,27 @@ namespace rin
         // if the size returned by index.data() is empty, fit_under() returns the given target_size (m_view->iconSize())
         const QSize thumbsize = rin::fit_under(m_view->iconSize(), index.data(Qt::SizeHintRole).toSize());
         const QString name = index.data(Qt::DisplayRole).toString();
-        return QSize(
-            option.rect.width(),
-            thumbsize.height() + m_approximate_text_height(name, option)
-        );
+        const auto font_metrics = QFontMetrics(option.font);
+        int w = m_fixed_width ? option.rect.width() : std::max(font_metrics.horizontalAdvance(name) + font_metrics.horizontalAdvance(name.back()), thumbsize.width());
+        int h = 0;
+
+        if (m_accurate_size_hints)
+        {
+            QTextLayout text_layout;
+            text_layout.setText(name);
+
+            if (w > m_view->viewport()->rect().width())
+            { w = option.rect.width(); }
+
+            const QSize text_layout_size = m_layout_text(text_layout, option, w);
+            w = text_layout_size.width();
+            h = text_layout_size.height();
+        }
+        else
+        { h = m_approximate_text_height(name, option); }
+
+        h += thumbsize.height();
+        return QSize(w, h);
     }
 
     QWidget* entity_view_item_delegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
@@ -230,7 +256,7 @@ namespace rin
         );
     }
 
-    QSize entity_view_item_delegate::m_layout_text(QTextLayout &layout, const QStyleOptionViewItem &opt, const int max_line_height) const
+    QSize entity_view_item_delegate::m_layout_text(QTextLayout& layout, const QStyleOptionViewItem& opt, const int max_line_width, const int max_line_height) const
     {
         // TODO: calculateElidedText()
         QTextOption text_option;
@@ -240,6 +266,7 @@ namespace rin
         // text_option.setAlignment(QStyle::visualAlignment(Qt::LayoutDirection::LeftToRight, Qt::AlignHCenter));
 
         layout.setTextOption(text_option);
+        layout.setFont(opt.font);
 
         // qcommonstyle.cpp: line 823: viewItemTextLayout(QTextLayout &textLayout, int lineWidth, int maxHeight = -1, int *lastVisibleLine = nullptr)
         int last_visible_line = -1;
@@ -254,7 +281,7 @@ namespace rin
             if (!line.isValid()) 
             { break; }
 
-            line.setLineWidth(opt.rect.width());
+            line.setLineWidth(max_line_width);
             line.setPosition(QPointF(0, height));
             height += line.height();
             width_used = qMax(width_used, line.naturalTextWidth()); // always <= line_width

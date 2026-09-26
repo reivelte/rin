@@ -285,8 +285,7 @@ namespace rin
         view->initViewItemOption(&opt);
         opt.rect = QRect(QPoint(), QSize(item_max_width, item_max_height));
         const QModelIndex index = model->index(row, col, parent);
-        const QSize item_size = view->itemDelegateForIndex(index)->sizeHint(opt, index);
-        return QSize(std::min(item_size.width(), item_max_width), item_size.height());
+        return view->itemDelegateForIndex(index)->sizeHint(opt, index);
     }
 
     inline void entity_view::impl::schedule_delayed_repaint(int delay)

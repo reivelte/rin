@@ -177,6 +177,7 @@ namespace rin
         {
             m_set_view_item_alignment(m_main_config->value<std::string>("view.item_row_alignment"));
         }
+        m_view->set_item_layout_mode(entity_view_item_layout_mode::Row_Column);
         setCentralWidget(m_view);
 
         connect(m_lineedit, &QLineEdit::returnPressed, this, &main_window::read_input);

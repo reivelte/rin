@@ -5,6 +5,7 @@
 #include <string>
 #include "tag_view.hpp"
 #include "model/entitymodel.hpp"
+#include "view/delegate.hpp"
 
 namespace rin
 {
@@ -119,6 +120,11 @@ namespace rin
     inline void tag_view::m_setup_block_mode()
     {
         entity_view::set_viewmode(entity_view_mode::Icon);
+        set_item_layout_mode(entity_view_item_layout_mode::Wrap);
+        
+        auto* delegate = item_delegate();
+        delegate->set_fixed_width(false);
+        delegate->set_accurate_size_hints(true);
     }
 
     inline void tag_view::m_ensure_correct_root()

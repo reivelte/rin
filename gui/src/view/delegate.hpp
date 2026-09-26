@@ -17,6 +17,9 @@ namespace rin
         public:
         entity_view_item_delegate(QObject* parent);
 
+        void set_fixed_width(bool fixed);
+        void set_accurate_size_hints(bool on);
+
         QRegion interactive_region(const QStyleOptionViewItem& option, const QModelIndex& index) const;
         QSize thumbnail_size(const QSize& max_thumbnail_size, const QModelIndex& index) const;
 
@@ -33,14 +36,17 @@ namespace rin
         
         private:
         int m_approximate_text_height(const QString& text, const QStyleOptionViewItem& opt) const;
-        QSize m_layout_text(QTextLayout& layout, const QStyleOptionViewItem& opt, const int max_line_height = -1) const; // returns layout size
+        QSize m_layout_text(QTextLayout& layout, const QStyleOptionViewItem& opt, const int max_line_width, const int max_line_height = -1) const; // returns layout size
         QRect m_thumbnail_rect(const QRect& item, const QSize& size) const;
         QRect m_name_rect(const QRect& item, const QRect& thumb, const QSize& size) const;
 
+        private:
         // QStyleOptionViewItem stores this as 'widget'
         // the constructor checks if we are assigned to an entity_view and throws an exception if this is not the case
         // this delegate is designed to only work with entity_view, we store a pointer to it here for convenience
         const entity_view* const m_view;
+        bool m_fixed_width;
+        bool m_accurate_size_hints;
     };
 
 }

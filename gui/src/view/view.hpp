@@ -10,7 +10,9 @@
 namespace rin
 {
     class entity_view_header;
+    class entity_view_item_delegate;
     enum class entity_view_mode : int8_t { Icon, List };
+    enum class entity_view_item_layout_mode : int8_t { Row_Column, Wrap };
     enum class entity_view_item_visual_align : int8_t { Center, Top, Bottom };
 
     class entity_view : public QAbstractItemView
@@ -22,13 +24,16 @@ namespace rin
         ~entity_view();
 
         void set_viewmode(entity_view_mode mode);
+        void set_item_layout_mode(entity_view_item_layout_mode mode);
         void set_iconsize(const QSize& size);
         void set_item_alignment(entity_view_item_visual_align align);
         void set_header_enabled(bool enabled);
         void set_indent(int scale);
+        void set_font_size(int pt);
         
         entity_view_mode viewmode() const;
         entity_view_header* header() const;
+        entity_view_item_delegate* item_delegate() const;
         QList<QModelIndex> selected_indexes() const;
         QList<QModelIndex> expanded_indexes() const;
 
