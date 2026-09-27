@@ -176,14 +176,7 @@ namespace rin
         const QString text = index.data(Qt::EditRole).toString();
         const int w = option.rect.width();
 
-        if (m_view->viewmode() == entity_view_mode::Icon)
-        {
-            editor = new resizing_textedit(text, parent, w, true);
-        }
-        else
-        {
-            editor = new resizing_textedit(text, parent, w, false);
-        }
+        editor = new resizing_textedit(text, parent, w, m_view->viewmode() == entity_view_mode::Icon);
 
         // TODO: find a better way to do this
         auto* this_ = const_cast<entity_view_item_delegate*>(this);
