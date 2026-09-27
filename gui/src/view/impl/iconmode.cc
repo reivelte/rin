@@ -15,7 +15,6 @@ namespace rin
         std::vector<entity_view_item_row> rows;
         binary_space_partition<int> bsp;
         binary_space_partition<int> bsp_rows;
-        int item_min_spacing_x;
         bool item_sizes_initialized;
         entity_view_item_layout_mode layout_mode;
 
@@ -80,7 +79,7 @@ namespace rin
         // textElideMode
         text_elide_mode = Qt::TextElideMode::ElideRight; // TODO in delegate
 
-        row_spacing_y = 20;
+        item_min_spacing_y = 20;
         show_elasticband = true;
         active_column = 0;
 
@@ -117,14 +116,14 @@ namespace rin
             bsp.clear();
             bsp_rows.clear();
             init_trees(vp, count);
-            total_content_height = row_spacing_y;
+            total_content_height = item_min_spacing_y;
 
             auto adjust_content_height = [&](QSize s, int height, int idx, int col) -> int
             {
                 height = std::max(height, s.height());
                 if ((col == num_cols - 1) || (idx == count - 1))
                 {
-                    total_content_height += (height + row_spacing_y);
+                    total_content_height += (height + item_min_spacing_y);
                     rows[idx / num_cols].height = height;
                     height = 0;
                 }
@@ -156,7 +155,7 @@ namespace rin
             .parent = root_index,
             .bounding_rect = vp.translated(offset()),
             .position = 0,
-            .y_hint = row_spacing_y,
+            .y_hint = item_min_spacing_y,
             .viewitem_index_start = 0,
             .viewitem_index_end = 0
         };
@@ -270,7 +269,7 @@ namespace rin
         const int item_width_with_min_spacing = item_max_width + item_min_spacing_x;
         const int n = std::max(viewsize.width() / item_width_with_min_spacing, 1);
         const int num_rows = qCeil(static_cast<qreal>(item_count) / static_cast<qreal>(n));
-        return QSize(viewsize.width(), (num_rows * (item_max_height + row_spacing_y)));
+        return QSize(viewsize.width(), (num_rows * (item_max_height + item_min_spacing_y)));
     }
 
     inline int entity_view::icon_mode::row_count_for_item_count(int item_count, int column_count) const
@@ -297,7 +296,7 @@ namespace rin
     void entity_view::icon_mode::do_row_layout(const QRect& r, const int num_cols, const int num_rows)
     {
         const auto [min_row_x, spacing_x] = minimum_row_x(r, num_cols);
-        const int min_row_y = r.top() + row_spacing_y;
+        const int min_row_y = r.top() + item_min_spacing_y;
         const int row_width = default_row_width(num_cols, spacing_x);
         int y = min_row_y;
 
@@ -308,7 +307,7 @@ namespace rin
             rows[i].count = 0;
             rows[i].hidden = false;
             bsp_rows.push(rows[i].rect, i);
-            y += rows[i].height + row_spacing_y;
+            y += rows[i].height + item_min_spacing_y;
         }
     }
 
@@ -361,7 +360,7 @@ namespace rin
         const int min_row_x = item_min_spacing_x;
         const int spacing_x = item_min_spacing_x;
         int x = min_row_x;
-        int y = row_spacing_y;
+        int y = item_min_spacing_y;
         int y_inc = 0;
         for (int i = start; i < end; ++i)
         {
@@ -371,7 +370,7 @@ namespace rin
             {
                 // wrap to next line
                 x = min_row_x;
-                y += y_inc + row_spacing_y;
+                y += y_inc + item_min_spacing_y;
                 y_inc = 0;
             }
 

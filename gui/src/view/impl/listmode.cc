@@ -189,7 +189,7 @@ namespace rin
         // textElideMode
         text_elide_mode = Qt::TextElideMode::ElideRight; // TODO in delegate
 
-        row_spacing_y = 0;
+        item_min_spacing_y = 0;
         show_elasticband = true;
         active_column = 0;
 
@@ -251,7 +251,7 @@ namespace rin
             .parent = root_index,
             .bounding_rect = QRect(),
             .position = 0,
-            .y_hint = row_spacing_y,
+            .y_hint = item_min_spacing_y,
             .viewitem_index_start = start, // we use global_position indexes instead of viewitem_indexes here
             .viewitem_index_end = end
         };
@@ -1056,7 +1056,7 @@ namespace rin
 
     inline int entity_view::list_mode::default_item_rect_height() const
     {
-        const int space = padding_y + row_spacing_y;
+        const int space = padding_y + item_min_spacing_y;
         
         if (item_max_thumbnail_size.isEmpty()) // if thumbnails are disabled
         { return view->fontMetrics().height() + space; }

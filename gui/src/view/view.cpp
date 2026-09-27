@@ -1099,7 +1099,7 @@ namespace rin
             const int row_width = iv->default_row_width(num_cols, spacing_x);
             const int start_row = start / num_cols;
             int h = iv->rows[start_row].height; // 0 if the first item to insert is leading the row
-            int y = (start_row == 0 ? m->row_spacing_y : iv->rows[start_row - 1].rect.bottom() + m->row_spacing_y);
+            int y = (start_row == 0 ? m->item_min_spacing_y : iv->rows[start_row - 1].rect.bottom() + m->item_min_spacing_y);
 
             for (int i = start; i < (end + 1); ++i)
             {
@@ -1123,14 +1123,14 @@ namespace rin
                     row.count = col_idx + 1;
                     row.hidden = false;
                     iv->bsp_rows.push(row.rect, row_idx);
-                    y += (row.height + m->row_spacing_y);
+                    y += (row.height + m->item_min_spacing_y);
                     h = 0;
                 }
             }
             
-            m->total_content_height = m->row_spacing_y;
+            m->total_content_height = m->item_min_spacing_y;
             for (const auto& row : iv->rows)
-            { m->total_content_height += (row.height + m->row_spacing_y); }
+            { m->total_content_height += (row.height + m->item_min_spacing_y); }
 
         } // if (viewmode() == entity_view_mode::Icon)
 

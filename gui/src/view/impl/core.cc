@@ -69,7 +69,8 @@ namespace rin
         int item_max_height;
         int item_min_height; // <= item_max_thumbnail_size.height
         int active_column;
-        int8_t row_spacing_y;
+        int item_min_spacing_x;
+        int item_min_spacing_y;
         bool show_elasticband;
         bool drag_is_active;
         bool delayed_pending_layout;
@@ -154,7 +155,7 @@ namespace rin
         set_hover_index(QModelIndex());
         interrupt_delayed_item_layout();
         view_loaded_items = 0;
-        total_content_height = row_spacing_y;
+        total_content_height = item_min_spacing_y;
         total_content_width = 0;
         applied_layouts.clear();
         pending_layouts.clear();
