@@ -121,10 +121,12 @@ namespace rin
     {
         entity_view::set_viewmode(entity_view_mode::Icon);
         set_item_layout_mode(entity_view_item_layout_mode::Wrap);
+        set_minimum_item_spacing_x(minimum_item_spacing_x() * 2);
         
         auto* delegate = item_delegate();
         delegate->set_fixed_width(false);
         delegate->set_accurate_size_hints(true);
+        delegate->set_draw_outlines(true);
     }
 
     inline void tag_view::m_ensure_correct_root()

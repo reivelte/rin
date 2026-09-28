@@ -8,6 +8,7 @@
 #include <QtCore/QRect>
 #include <QtGui/QPainter>
 #include <QtGui/QFontMetrics>
+#include <QtGui/QColor>
 #include "model/entity.hpp"
 
 namespace rin
@@ -31,4 +32,6 @@ namespace rin
         }
         return ret;
     }
+
+    void draw_rounded_rect(QPainter& p, const QRect& r, const QColor& c, qreal xr, qreal yr, int pen_width);
 } // namespace rin

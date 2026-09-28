@@ -178,6 +178,20 @@ namespace rin
         scheduleDelayedItemsLayout();
     }
 
+    void entity_view::set_minimum_item_spacing_x(int x)
+    {
+        m->item_min_spacing_x = x;
+        m->clear();
+        scheduleDelayedItemsLayout();
+    }
+
+    void entity_view::set_minimum_item_spacing_y(int y)
+    {
+        m->item_min_spacing_y = y;
+        m->clear();
+        scheduleDelayedItemsLayout();
+    }
+
     entity_view_mode entity_view::viewmode() const
     {
         return m->current_viewmode;
@@ -220,6 +234,21 @@ namespace rin
             indexes << m->root_index;
         }
         return indexes;
+    }
+
+    int entity_view::minimum_item_spacing_x() const
+    {
+        return m->item_min_spacing_x;
+    }
+
+    int entity_view::minimum_item_spacing_y() const
+    {
+        return m->item_min_spacing_y;
+    }
+
+    QRect entity_view::outline_rect(const QModelIndex& index) const
+    {
+        return m->map_to_viewport(m->outline_rect(index));
     }
 
     void entity_view::setModel(QAbstractItemModel* model)

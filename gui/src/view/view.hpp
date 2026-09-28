@@ -30,12 +30,17 @@ namespace rin
         void set_header_enabled(bool enabled);
         void set_indent(int scale);
         void set_font_size(int pt);
+        void set_minimum_item_spacing_x(int x);
+        void set_minimum_item_spacing_y(int y);
         
         entity_view_mode viewmode() const;
         entity_view_header* header() const;
         entity_view_item_delegate* item_delegate() const;
         QList<QModelIndex> selected_indexes() const;
         QList<QModelIndex> expanded_indexes() const;
+        int minimum_item_spacing_x() const;
+        int minimum_item_spacing_y() const;
+        QRect outline_rect(const QModelIndex& index) const;
 
         //reimplemented public functions
         void setModel(QAbstractItemModel* model) override;

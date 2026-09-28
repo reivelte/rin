@@ -19,6 +19,7 @@ namespace rin
 
         void set_fixed_width(bool fixed);
         void set_accurate_size_hints(bool on);
+        void set_draw_outlines(bool on);
 
         QRegion interactive_region(const QStyleOptionViewItem& option, const QModelIndex& index) const;
         QSize thumbnail_size(const QSize& max_thumbnail_size, const QModelIndex& index) const;
@@ -47,6 +48,7 @@ namespace rin
         const entity_view* const m_view;
         bool m_fixed_width;
         bool m_accurate_size_hints;
+        bool m_draw_outlines;
     };
 
 }

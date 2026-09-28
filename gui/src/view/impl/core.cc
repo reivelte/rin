@@ -64,6 +64,7 @@ namespace rin
         int item_default_text_width;
         int item_single_line_text_height;
         int item_text_glyph_width;
+        int item_interior_spacing_x;
         int item_interior_spacing_y;
         int item_max_width;
         int item_max_height;
@@ -126,6 +127,7 @@ namespace rin
         inline bool index_is_enabled(const QModelIndex& index) const;
         inline QItemSelection selection_at(const QRect& rect);
         inline QRegion interactive_region(const QModelIndex& index) const;
+        inline QRect outline_rect(const QModelIndex& index) const;
         
         inline bool valid_index(const QModelIndex& index) const;
         inline bool index_is_in_scope(const QModelIndex& index) const;
@@ -389,6 +391,19 @@ namespace rin
     {
         // same as view->visualRect()
         return map_to_viewport(rect_for_model_index(index));
+    }
+
+    inline QRect entity_view::impl::outline_rect(const QModelIndex& index) const
+    {
+        auto r = rect_for_model_index(index);
+        auto outline = r;
+        if (r.isValid())
+        {
+            outline.setWidth(r.width() + (item_interior_spacing_x * 2));
+            outline.setHeight(r.height() + (item_interior_spacing_y * 2));
+            outline.moveCenter(r.center());
+        }
+        return outline;
     }
 
     inline bool entity_view::impl::valid_index(const QModelIndex& index) const

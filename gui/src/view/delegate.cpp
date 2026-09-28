@@ -8,6 +8,7 @@
 #include <QtGui/QPainterStateGuard>
 #include "../view/view.hpp"
 #include "../utility/sizing.hpp"
+#include "../utility/painting.hpp"
 #include "../widgets/resizing_textedit.hpp"
 #include "delegate.hpp"
 
@@ -15,7 +16,7 @@ namespace rin
 {
     entity_view_item_delegate::entity_view_item_delegate(QObject* parent) :
         QStyledItemDelegate(parent), m_view(qobject_cast<const entity_view*>(parent)),
-        m_fixed_width(true), m_accurate_size_hints(false)
+        m_fixed_width(true), m_accurate_size_hints(false), m_draw_outlines(false)
     {
         if (m_view == nullptr)
         {
@@ -31,6 +32,11 @@ namespace rin
     void entity_view_item_delegate::set_accurate_size_hints(bool on)
     {
         m_accurate_size_hints = on;
+    }
+
+    void entity_view_item_delegate::set_draw_outlines(bool on)
+    {
+        m_draw_outlines = on;
     }
 
     QRegion entity_view_item_delegate::interactive_region(const QStyleOptionViewItem& option, const QModelIndex& index) const
@@ -128,6 +134,13 @@ namespace rin
             }
             else
             { painter->fillRect(thumb_rect | name_rect, hover_highlight); }
+        }
+
+        if (m_draw_outlines)
+        {
+            // TODO: interface to make radius and pen width values adjustable
+            const auto outline = m_view->outline_rect(index);
+            rin::draw_rounded_rect(*painter, outline, opt.palette.color(cg, QPalette::ColorRole::Accent), 10, 10, 5);
         }
     }
 

@@ -79,6 +79,8 @@ namespace rin
         // textElideMode
         text_elide_mode = Qt::TextElideMode::ElideRight; // TODO in delegate
 
+        item_interior_spacing_x = 8;
+        item_interior_spacing_y = 8;
         item_min_spacing_y = 20;
         show_elasticband = true;
         active_column = 0;
@@ -357,20 +359,23 @@ namespace rin
         const QRect r = view->viewport()->rect();
         const int start = 0;
         const int end = items.size();
-        const int min_row_x = item_min_spacing_x;
+        const int min_row_x = item_min_spacing_x + item_interior_spacing_x;
+        const int min_x_inc = item_interior_spacing_x;
+        const int min_y_inc = item_min_spacing_y + item_interior_spacing_y;
         const int spacing_x = item_min_spacing_x;
         int x = min_row_x;
         int y = item_min_spacing_y;
         int y_inc = 0;
+
         for (int i = start; i < end; ++i)
         {
-            const int w = items[i].width() + spacing_x;
+            const int w = items[i].width() + spacing_x + min_x_inc;
 
             if (x + w >= r.right())
             {
                 // wrap to next line
                 x = min_row_x;
-                y += y_inc + item_min_spacing_y;
+                y += y_inc + min_y_inc;
                 y_inc = 0;
             }
 
