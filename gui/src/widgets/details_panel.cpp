@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include <QtWidgets/QTableWidgetItem>
+#include <QtWidgets/QHeaderView>
 #include <QtWidgets/QStyle>
 #include <QtWidgets/QHBoxLayout>
 #include <QtGui/QPainter>
@@ -9,7 +11,9 @@
 #include <QtGui/QTextOption>
 #include <QtGui/QFontMetrics>
 #include <QtGui/QColor>
+#include <suzuri/utility/string.hpp>
 #include "details_panel.hpp"
+#include "model/entity.hpp"
 #include "utility/sizing.hpp"
 #include "utility/painting.hpp"
 
@@ -18,13 +22,29 @@ namespace rin
     details_panel::details_panel(QWidget* parent, entity_model* model) :
         ui_panel(parent),
         m_items(), m_model(model),
-        m_thumbnail(nullptr), m_tagview(nullptr)
+        m_thumbnail(nullptr),
+        m_details_splitter(nullptr),
+        m_info_table(nullptr), m_tagview(nullptr),
+        m_padding(4)
     {
         if (!m_model)
         { throw std::runtime_error("model was nullptr"); }
 
         m_thumbnail = new ui_image(this, QPixmap());
         m_tagview = new tag_view(this, m_model, tag_view::viewmode::Block);
+        
+        m_info_table = new QTableWidget(this);
+        m_info_table->viewport()->setBackgroundRole(QPalette::Window);
+        m_info_table->setCornerButtonEnabled(false);
+        m_info_table->setColumnCount(2);
+        m_info_table->setShowGrid(false);
+        m_info_table->horizontalHeader()->setStretchLastSection(true);
+        m_info_table->horizontalHeader()->hide();
+        m_info_table->verticalHeader()->hide();
+
+        m_details_splitter = new QSplitter(Qt::Orientation::Vertical, this);
+        m_details_splitter->addWidget(m_info_table);
+        m_details_splitter->addWidget(m_tagview);
 
         connect(m_model, &entity_model::rowsInserted, this, &details_panel::insert_tags);
         connect(m_model, qOverload<const QModelIndex&>(&entity_model::query_done), this, &details_panel::insert_tags);
@@ -39,9 +59,9 @@ namespace rin
         clear();
         if (m_model->valid_index(index))
         {
+            const auto& e = m_model->at(index);
             m_items.push_back(index);
 
-            const auto& e = m_model->at(index);
             if (e.has_attribute(Icon))
             {
                 // calling model->data() instead of e.attribute() allows us to get an entity thumbnail if one exists
@@ -51,18 +71,10 @@ namespace rin
                 const auto s = rin::fit_under(size(), icon.actualSize(size(), QIcon::Mode::Normal, QIcon::State::On));
                 m_set_thumbnail(icon.pixmap(s));
             }
+            m_set_attributes_in_table(e);
 
-            QString id;
-            if (e.has_attribute(Id))
-            { id = e.attribute<QString>(Id); }
-            else
-            { id = m_model->id_for_index(index); }
-
-            QString q;
-            if (e.type() == sz::entity_type::File)
-            { q = "!taglist:file://" + id; }
-            else
-            { q = "!taglist:" + id; }
+            const QString id = e.has_attribute(Id) ? e.attribute<QString>(Id) : m_model->id_for_index(index);
+            const QString q = e.type() == sz::entity_type::File ? "!taglist:file://" + id : "!taglist:" + id;
 
             if (const QModelIndex node_index = m_model->query(q); m_model->valid_index(node_index))
             { m_watching.insert(node_index); }
@@ -86,6 +98,7 @@ namespace rin
         m_items.clear();
         m_watching.clear();
         m_tagview->clear();
+        m_info_table->clear();
         update();
     }
 
@@ -98,9 +111,7 @@ namespace rin
     {
         ui_panel::resizeEvent(event);
 
-        const int w = event->size().width();
-        m_thumbnail->resize(w, m_thumbnail->heightForWidth(w));
-
+        m_recenter_thumbnail();
         m_adjust_widget_geometries();
     }
 
@@ -127,19 +138,79 @@ namespace rin
         }
     }
 
-    void details_panel::m_set_thumbnail(const QPixmap& thumbnail)
+    void details_panel::m_set_attributes_in_table(const reflexive_entity& e)
     {
-        m_thumbnail->set_image(thumbnail);
+        using enum entity_attribute_type;
+        
+        const auto& attrs = e.attribute_map();
+        const int w = width();
+        QString max_len_str;
+        int row = 0;
+        
+        m_info_table->setRowCount(static_cast<int>(attrs.size()));
+        
+        for (const auto& [attr, value] : attrs)
+        {
+            switch (attr)
+            {
+            case Size:
+            case Modified:
+            case Created:
+            case Accessed:
+            case File_Type:
+            {
+                const QString attr_str = QString::fromStdString(sz::utility::to_string(attr) + ": ").replace("_", " ");
+            
+                if (attr_str.size() > max_len_str.size())
+                { max_len_str = attr_str; }
+
+                auto* attr_str_item = new QTableWidgetItem(attr_str);
+                attr_str_item->setTextAlignment(Qt::AlignmentFlag::AlignTop | Qt::AlignmentFlag::AlignRight);
+
+                auto* attr_value_item = new QTableWidgetItem(std::get<QString>(value));
+                attr_value_item->setTextAlignment(Qt::AlignmentFlag::AlignTop);
+
+                m_info_table->setItem(row, 0, attr_str_item);
+                m_info_table->setItem(row, 1, attr_value_item);
+
+                m_info_table->resizeRowToContents(row);
+                m_info_table->setRowHeight(row, m_info_table->rowHeight(row) + m_padding);
+                ++row;
+                break;
+            }
+            
+            default: continue;
+            }
+        }
+        m_info_table->setRowCount(row);
+        m_info_table->setColumnWidth(0, qCeil(static_cast<qreal>(w) * 0.40));
+    }
+
+    void details_panel::m_recenter_thumbnail()
+    {
         auto thr = m_thumbnail->rect();
         thr.setX(thr.x() + (rect().center().x() - thr.center().x()));
         m_thumbnail->move(thr.topLeft());
     }
 
+    void details_panel::m_set_thumbnail(const QPixmap& thumbnail)
+    {
+        m_thumbnail->set_image(thumbnail);
+        m_recenter_thumbnail();
+    }
+
     void details_panel::m_adjust_widget_geometries()
     {
         const int w = width();
-        m_tagview->move(QPoint(0, m_thumbnail->height()));
-        m_tagview->resize(w, height() - m_thumbnail->height());
+        const int h = m_thumbnail->height();
+        int placeholder = 32; // WIP, space reserved for a name label
+        const int used_h = h + placeholder + m_padding;
+        m_details_splitter->move(QPoint(0, used_h));
+        m_details_splitter->resize(w, height() - used_h);
+
+        m_info_table->resizeRowsToContents();
+        for (int i = 0; i < m_info_table->rowCount(); ++i)
+        { m_info_table->setRowHeight(i, m_info_table->rowHeight(i) + m_padding); }
     }
 
     // TODO

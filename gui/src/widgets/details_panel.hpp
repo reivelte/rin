@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
+#include <QtWidgets/QSplitter>
+#include <QtWidgets/QTableWidget>
+#include <QtGui/QPixmap>
 #include <QtGui/QIcon>
 #include "panel.hpp"
 #include "model/entity.hpp"
@@ -36,6 +39,8 @@ namespace rin
         void insert_tags(const QModelIndex& parent);
 
         private:
+        void m_set_attributes_in_table(const reflexive_entity& e);
+        void m_recenter_thumbnail();
         void m_set_thumbnail(const QPixmap& thumbnail);
         void m_adjust_widget_geometries();
 
@@ -44,9 +49,11 @@ namespace rin
         QList<QModelIndex> m_items;
         QSet<QModelIndex> m_watching;
         entity_model* m_model;
-
         ui_image* m_thumbnail;
+        QSplitter* m_details_splitter;
+        QTableWidget* m_info_table;
         tag_view* m_tagview;
+        int m_padding;
     };
     
 } // namespace rin
