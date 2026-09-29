@@ -68,7 +68,7 @@ namespace rin
         void set_display_attributes(const std::vector<entity_attribute_type>& attrs);
         void set_display_attribute_string(entity_attribute_type attr, QString str);
         
-        QModelIndex query(const QString& text);
+        QModelIndex query(const QString& text, bool replace_root = true);
         QModelIndex query(const QString& text, const QList<QUrl>& urls);
 
         void tag(const QModelIndex& index, const std::vector<reflexive_entity>& tag_entities);

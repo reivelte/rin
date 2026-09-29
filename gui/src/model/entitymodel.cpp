@@ -122,19 +122,22 @@ namespace rin
     }
 
     // root queries with no preexisting item entry have a -1 row value in the returned index
-    QModelIndex entity_model::query(const QString& text)
+    QModelIndex entity_model::query(const QString& text, bool replace_root)
     {
         if (text.isEmpty())
         { return QModelIndex(); }
         
-        if (m_root)
+        if (replace_root && m_root)
         { m_deactivate(*m_root); }
 
         if (m_tree.contains(text))
         {
             qDebug() << "entity_model::query(): do requery for " << text;
             invalidate(text);
-            m_root = m_tree[text].key;
+
+            if (replace_root)
+            { m_root = m_tree[text].key; }
+
             return m_index_for_querytext(text);
         }
 
@@ -154,7 +157,10 @@ namespace rin
         }
 
         m_create_node(text, parent_key, i);
-        m_root = m_tree[text].key;
+
+        if (replace_root || (!m_root))
+        { m_root = m_tree[text].key; }
+
         return createIndex(i, 0, m_tree.contains(parent_key) ? parent_key : *m_root);
     }
 
@@ -393,7 +399,7 @@ namespace rin
     {
         if (m_tree.contains(query_text))
         { return m_index_for_querytext(query_text); }
-        
+
         return QModelIndex();
     }
 

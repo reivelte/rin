@@ -76,7 +76,7 @@ namespace rin
             const QString id = e.has_attribute(Id) ? e.attribute<QString>(Id) : m_model->id_for_index(index);
             const QString q = e.type() == sz::entity_type::File ? "!taglist:file://" + id : "!taglist:" + id;
 
-            if (const QModelIndex node_index = m_model->query(q); m_model->valid_index(node_index))
+            if (const QModelIndex node_index = m_model->query(q, false); m_model->valid_index(node_index))
             { m_watching.insert(node_index); }
         }
         m_adjust_widget_geometries();

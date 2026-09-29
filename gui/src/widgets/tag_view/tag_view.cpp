@@ -108,7 +108,7 @@ namespace rin
 
     inline void tag_view::m_default_populate()
     {
-        setRootIndex(m_model->query("!taglist:"));
+        setRootIndex(m_model->query("!taglist:", false));
     }
 
     inline void tag_view::m_setup_oneline_mode()
