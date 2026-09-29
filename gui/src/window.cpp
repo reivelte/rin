@@ -300,8 +300,15 @@ namespace rin
     void main_window::navigate(const QModelIndex& index, bool forward)
     {
         Q_UNUSED(index);
-        if (const sz::result<QModelIndex> root = m_model->step(forward); root)
-        { m_set_root(*root); }
+
+        QString q;
+        if (forward)
+        { q = m_historyman.step_forward() ? m_historyman.current() : ""; }
+        else
+        { q = m_historyman.step_back() ? m_historyman.current() : ""; }
+
+        if (const QModelIndex idx = m_model->index(q); q.size() && m_model->valid_index(idx))
+        { m_set_root(idx); }
         else
         { qDebug() << "main_window::navigate: step not valid"; }
     }
@@ -531,6 +538,7 @@ namespace rin
     {
         if (const QModelIndex root = m_model->query(text); m_model->valid_index(root))
         {
+            m_historyman.step_forward_with(text);
             m_lineedit->setText(m_model->root_query());
             m_view->setRootIndex(root);
             m_set_window_title();

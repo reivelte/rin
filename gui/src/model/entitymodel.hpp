@@ -21,7 +21,6 @@
 #include "entity.hpp"
 #include "tree.hpp"
 #include "datamanager.hpp"
-#include "historymanager.hpp"
 
 namespace rin
 {
@@ -78,7 +77,6 @@ namespace rin
 
         void append_data(const QModelIndex& parent, const std::vector<reflexive_entity>& data);
         
-        sz::result<QModelIndex> step(bool forward = true);
         void watch(const QModelIndex& index);
         void unwatch(const QModelIndex& index);
         
@@ -95,6 +93,7 @@ namespace rin
         bool has_thumbnail(const QModelIndex& index) const;
         bool thumbnail_loaded(const QModelIndex& index) const;
         QModelIndex root_index() const;
+        QModelIndex index(const QString& query_text);
         QString root_query() const;
         QString id_for_index(const QModelIndex& index) const;
         const reflexive_entity& at(const QModelIndex& index);
@@ -219,7 +218,6 @@ namespace rin
         using enum entity_attribute_type;
         std::unique_ptr<entity_data_manager> m_dataman;
         std::filesystem::path m_database_path;
-        history_manager m_historyman;
         QThread m_thumbman;
         entity_tree m_tree;
         QHash<QMimeType, QIcon> m_icon_cache;

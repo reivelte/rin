@@ -13,6 +13,7 @@
 #include "widgets/dialogs/settings/dialog.hpp"
 #include "widgets/details_panel.hpp"
 #include "model/entitymodel.hpp"
+#include "model/historymanager.hpp"
 
 QT_BEGIN_NAMESPACE
 class QToolBar;
@@ -141,6 +142,7 @@ namespace rin
         entity_view* m_view;
         tag_view* m_tag_view;
         entity_model* m_model; // TODO: proxy models
+        history_manager m_historyman;
         
     };
 }

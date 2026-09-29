@@ -25,7 +25,7 @@ namespace rin
     entity_model::entity_model(QObject* parent, const std::filesystem::path& database_path) :
         QAbstractItemModel(parent), 
         m_dataman(std::make_unique<entity_data_manager>(database_path)), m_database_path(database_path),
-        m_historyman(), m_thumbman(),
+        m_thumbman(),
         m_tree(),
         m_thumbnails(), m_items_pending_update(),
         m_pending_queries(), m_delayed_sorts(), m_pending_query_timer(), m_delayed_sort_timer(),
@@ -135,7 +135,6 @@ namespace rin
             qDebug() << "entity_model::query(): do requery for " << text;
             invalidate(text);
             m_root = m_tree[text].key;
-            m_historyman.step_forward_with(text);
             return m_index_for_querytext(text);
         }
 
@@ -156,7 +155,6 @@ namespace rin
 
         m_create_node(text, parent_key, i);
         m_root = m_tree[text].key;
-        m_historyman.step_forward_with(text);
         return createIndex(i, 0, m_tree.contains(parent_key) ? parent_key : *m_root);
     }
 
@@ -253,14 +251,6 @@ namespace rin
     //     for (const auto& [query_text, entities] : data)
     //     { m_dataman->query(m_tree[query_text].descriptor, entities); }
     // }
-
-    sz::result<QModelIndex> entity_model::step(bool forward)
-    {
-        if (forward ? m_historyman.step_forward() : m_historyman.step_back())
-        { return m_reset_root_query(m_historyman.current()); }
-        
-        return {sz::result_code::Invalid_Argument};
-    }
 
     void entity_model::watch(const QModelIndex& index)
     {
@@ -396,6 +386,14 @@ namespace rin
     {
         if (m_root)
         { return m_index_for_querytext(m_id_for_key(*m_root)); }
+        return QModelIndex();
+    }
+
+    QModelIndex entity_model::index(const QString& query_text)
+    {
+        if (m_tree.contains(query_text))
+        { return m_index_for_querytext(query_text); }
+        
         return QModelIndex();
     }
 
@@ -1303,7 +1301,6 @@ namespace rin
     {
         clear_thumbnails();
         m_dataman->clear();
-        m_historyman.clear();
         m_pending_queries.clear();
         m_pending_query_timer.stop();
         m_delayed_sort_timer.stop();
