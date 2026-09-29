@@ -36,6 +36,10 @@ namespace rin
         void insert_tags(const QModelIndex& parent);
 
         private:
+        void m_set_thumbnail(const QPixmap& thumbnail);
+        void m_adjust_widget_geometries();
+
+        private:
         using enum entity_attribute_type;
         QList<QModelIndex> m_items;
         QSet<QModelIndex> m_watching;
