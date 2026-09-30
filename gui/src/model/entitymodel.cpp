@@ -161,7 +161,7 @@ namespace rin
         if (replace_root || (!m_root))
         { m_root = m_tree[text].key; }
 
-        return createIndex(i, 0, m_tree.contains(parent_key) ? parent_key : *m_root);
+        return m_index_for_querytext(text);
     }
 
     // create a concept query out of the entities derived from 'urls'
