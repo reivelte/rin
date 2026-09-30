@@ -723,6 +723,16 @@ namespace rin
                 }
                 e.set_attribute(Tags, std::move(tagset));
             }
+            else
+            {
+                const auto ct = static_cast<qint64>(dbinfo.createtime);
+                const auto mt = static_cast<qint64>(dbinfo.modtime);
+                e.set_attribute(Created, QDateTime::fromSecsSinceEpoch(ct).toString());
+                e.set_attribute(Created_Int, ct);
+                e.set_attribute(Modified, QDateTime::fromSecsSinceEpoch(mt).toString());
+                e.set_attribute(Modified_Int, mt);
+                e.set_attribute(File_Type, e.type() == sz::entity_type::Tag ? "tag" : "concept");
+            }
         }
     }
 
