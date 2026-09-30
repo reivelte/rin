@@ -684,16 +684,23 @@ namespace rin
             const auto fsinfo = e.attribute<QFileInfo>();
             const auto mime = m_mimedb.mimeTypeForFile(fsinfo, QMimeDatabase::MatchExtension);
             e.set_attribute(Mime_Type, mime);
+            e.set_attribute(Modified_Int, fsinfo.lastModified().toSecsSinceEpoch());
             e.set_attribute(Modified, fsinfo.lastModified().toString());
+            e.set_attribute(Created_Int, fsinfo.birthTime().toSecsSinceEpoch());
             e.set_attribute(Created, fsinfo.birthTime().toString());
+            e.set_attribute(Accessed_Int, fsinfo.lastRead().toSecsSinceEpoch());
             e.set_attribute(Accessed, fsinfo.lastRead().toString());
             e.set_attribute(File_Type, mime.comment().isEmpty() ? mime.name() : mime.comment());
 
             if (fsinfo.isFile())
-            { e.set_attribute(Size, QLocale::system().formattedDataSize(fsinfo.size())); }
+            {
+                e.set_attribute(Size_Int, fsinfo.size());
+                e.set_attribute(Size, QLocale::system().formattedDataSize(fsinfo.size()));
+            }
             else
             {
-                const int64_t size = m_query_size(id);
+                const auto size = static_cast<qint64>(m_query_size(id));
+                e.set_attribute(Size_Int, size);
                 e.set_attribute(Size, QLocale::system().toString(size) + " " + tr("items"));
             }
         }
