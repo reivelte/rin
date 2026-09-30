@@ -36,11 +36,12 @@ namespace rin
         Url,                    // QUrl
 
         // applies to filesystem based entities
-        Size, Modified, Created, Accessed, File_Type, // string
-        Rating,                                       // int
-        Icon,                                         // QIcon
-        File_Info,                                    // QFileInfo
-        Mime_Type,                                    // QMimeType
+        Size, Modified, Created, Accessed, File_Type,       // string
+        Size_Int, Modified_Int, Created_Int, Accessed_Int,  // qint64
+        Rating,                                             // int
+        Icon,                                               // QIcon
+        File_Info,                                          // QFileInfo
+        Mime_Type,                                          // QMimeType
 
         // applies to filesystem based image entities
         Sizehint,               // tuple<int, int> or similar
@@ -53,7 +54,7 @@ namespace rin
         tag_set,
         QString, QSize, QFileInfo, QUrl,
         QIcon, QMimeType,
-        int
+        qint64, int
     >
     entity_attribute_base;
 
