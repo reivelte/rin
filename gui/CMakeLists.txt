@@ -13,6 +13,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui Svg)
 set(SOURCES #!BEGIN: SOURCE LIST
   src/main.cpp
   src/window.cpp
+  src/utility/text.cpp
   src/utility/painting.cpp
   src/tagger/tagger.cpp
   src/tagger/tag_panel.cpp
@@ -42,6 +43,7 @@ set(SOURCES #!BEGIN: SOURCE LIST
   src/window.hpp
   src/rin.hpp
   src/utility/bsp.hpp
+  src/utility/text.hpp
   src/utility/sizing.hpp
   src/utility/painting.hpp
   src/tagger/tagger.hpp

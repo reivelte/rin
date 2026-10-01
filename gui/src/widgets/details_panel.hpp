@@ -7,6 +7,7 @@
 #include <QtWidgets/QTableWidget>
 #include <QtGui/QPixmap>
 #include <QtGui/QIcon>
+#include <QtGui/QTextLayout>
 #include "panel.hpp"
 #include "model/entity.hpp"
 #include "model/entitymodel.hpp"
@@ -42,6 +43,7 @@ namespace rin
         void m_set_attributes_in_table(const reflexive_entity& e);
         void m_recenter_thumbnail();
         void m_set_thumbnail(const QPixmap& thumbnail);
+        void m_set_name(const QString& name);
         void m_adjust_widget_geometries();
 
         private:
@@ -53,6 +55,10 @@ namespace rin
         QSplitter* m_details_splitter;
         QTableWidget* m_info_table;
         tag_view* m_tagview;
+        QTextLayout m_name_layout;
+        QFont m_name_font;
+        QRect m_name_rect;
+        qreal m_info_table_attr_name_col_width_ratio;
         int m_padding;
     };
     

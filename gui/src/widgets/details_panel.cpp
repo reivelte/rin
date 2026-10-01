@@ -16,6 +16,7 @@
 #include "model/entity.hpp"
 #include "utility/sizing.hpp"
 #include "utility/painting.hpp"
+#include "utility/text.hpp"
 
 namespace rin
 {
@@ -25,13 +26,16 @@ namespace rin
         m_thumbnail(nullptr),
         m_details_splitter(nullptr),
         m_info_table(nullptr), m_tagview(nullptr),
-        m_padding(4)
+        m_name_rect(), m_info_table_attr_name_col_width_ratio(0.35), m_padding(4)
     {
         if (!m_model)
         { throw std::runtime_error("model was nullptr"); }
 
         m_thumbnail = new ui_image(this, QPixmap());
-        m_tagview = new tag_view(this, m_model, tag_view::viewmode::Block);
+        
+        m_name_font = font();
+        m_name_font.setBold(true);
+        m_name_font.setPointSize(m_name_font.pointSize() + 2);
         
         m_info_table = new QTableWidget(this);
         m_info_table->viewport()->setBackgroundRole(QPalette::Window);
@@ -41,6 +45,8 @@ namespace rin
         m_info_table->horizontalHeader()->setStretchLastSection(true);
         m_info_table->horizontalHeader()->hide();
         m_info_table->verticalHeader()->hide();
+
+        m_tagview = new tag_view(this, m_model, tag_view::viewmode::Block);
 
         m_details_splitter = new QSplitter(Qt::Orientation::Vertical, this);
         m_details_splitter->addWidget(m_info_table);
@@ -71,6 +77,7 @@ namespace rin
                 const auto s = rin::fit_under(size(), icon.actualSize(size(), QIcon::Mode::Normal, QIcon::State::On));
                 m_set_thumbnail(icon.pixmap(s));
             }
+            m_set_name(e.attribute<QString>(Name));
             m_set_attributes_in_table(e);
 
             const QString id = e.has_attribute(Id) ? e.attribute<QString>(Id) : m_model->id_for_index(index);
@@ -105,6 +112,9 @@ namespace rin
     void details_panel::paintEvent(QPaintEvent* event)
     {
         QFrame::paintEvent(event);
+
+        QPainter painter(this);
+        m_name_layout.draw(&painter, m_name_rect.topLeft());
     }
 
     void details_panel::resizeEvent(QResizeEvent* event)
@@ -183,7 +193,7 @@ namespace rin
             }
         }
         m_info_table->setRowCount(row);
-        m_info_table->setColumnWidth(0, qCeil(static_cast<qreal>(w) * 0.40));
+        m_info_table->setColumnWidth(0, qCeil(static_cast<qreal>(w) * m_info_table_attr_name_col_width_ratio));
     }
 
     void details_panel::m_recenter_thumbnail()
@@ -199,16 +209,31 @@ namespace rin
         m_recenter_thumbnail();
     }
 
+    void details_panel::m_set_name(const QString& name)
+    {
+        m_name_layout.setText(name);
+    }
+
     void details_panel::m_adjust_widget_geometries()
     {
         const int w = width();
-        const int h = m_thumbnail->height();
-        int placeholder = 32; // WIP, space reserved for a name label
-        const int used_h = h + placeholder + m_padding;
-        m_details_splitter->move(QPoint(0, used_h));
-        m_details_splitter->resize(w, height() - used_h);
+        const int thumbnail_height = m_thumbnail->height();
+        int used_height = thumbnail_height + m_padding * 2;
+        
+        const QString text = m_items.size() == 1 ? m_model->at(m_items[0]).attribute<QString>(Name) : "";
+
+        m_name_layout.clearLayout();
+        const QSize text_area = rin::layout_text(m_name_layout, m_name_font, Qt::AlignmentFlag::AlignCenter, w - (m_padding * 2));
+
+        m_name_rect.setTopLeft(QPoint(m_padding, used_height));
+        m_name_rect.setSize(text_area);
+        used_height += text_area.height() + m_padding;
+
+        m_details_splitter->move(QPoint(0, used_height));
+        m_details_splitter->resize(w, height() - used_height);
 
         m_info_table->resizeRowsToContents();
+
         for (int i = 0; i < m_info_table->rowCount(); ++i)
         { m_info_table->setRowHeight(i, m_info_table->rowHeight(i) + m_padding); }
     }
