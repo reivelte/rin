@@ -20,23 +20,10 @@
 
 namespace rin
 {
-    details_panel::details_panel(QWidget* parent, entity_model* model) :
-        ui_panel(parent),
-        m_items(), m_model(model),
-        m_thumbnail(nullptr),
-        m_details_splitter(nullptr),
-        m_info_table(nullptr), m_tagview(nullptr),
-        m_name_rect(), m_info_table_attr_name_col_width_ratio(0.35), m_padding(4)
+    entity_metadata_view::entity_metadata_view(ui_panel* parent, entity_model* model, int padding) :
+        QFrame(parent), m_model(model), m_info_table(nullptr), m_tagview(nullptr),
+        m_info_table_attr_name_col_width_ratio(0.35), m_padding(padding)
     {
-        if (!m_model)
-        { throw std::runtime_error("model was nullptr"); }
-
-        m_thumbnail = new ui_image(this, QPixmap());
-        
-        m_name_font = font();
-        m_name_font.setBold(true);
-        m_name_font.setPointSize(m_name_font.pointSize() + 2);
-        
         m_info_table = new QTableWidget(this);
         m_info_table->viewport()->setBackgroundRole(QPalette::Window);
         m_info_table->setCornerButtonEnabled(false);
@@ -45,110 +32,78 @@ namespace rin
         m_info_table->horizontalHeader()->setStretchLastSection(true);
         m_info_table->horizontalHeader()->hide();
         m_info_table->verticalHeader()->hide();
-
+        
         m_tagview = new tag_view(this, m_model, tag_view::viewmode::Block);
 
-        m_details_splitter = new QSplitter(Qt::Orientation::Vertical, this);
-        m_details_splitter->addWidget(m_info_table);
-        m_details_splitter->addWidget(m_tagview);
+        m_info_table->setVerticalScrollBarPolicy(Qt::ScrollBarPolicy::ScrollBarAlwaysOff);
+        m_info_table->setHorizontalScrollBarPolicy(Qt::ScrollBarPolicy::ScrollBarAlwaysOff);
 
-        connect(m_model, &entity_model::rowsInserted, this, &details_panel::insert_tags);
-        connect(m_model, qOverload<const QModelIndex&>(&entity_model::query_done), this, &details_panel::insert_tags);
+        connect(m_model, &entity_model::rowsInserted, this, &entity_metadata_view::insert_tags);
+        connect(m_model, qOverload<const QModelIndex&>(&entity_model::query_done), this, &entity_metadata_view::insert_tags);
     }
 
-    details_panel::~details_panel()
+    entity_metadata_view::~entity_metadata_view()
     {
     }
 
-    void details_panel::set_item(const QModelIndex& index)
+    void entity_metadata_view::clear()
     {
-        clear();
-        if (m_model->valid_index(index))
-        {
-            const auto& e = m_model->at(index);
-            m_items.push_back(index);
-
-            if (e.has_attribute(Icon))
-            {
-                // calling model->data() instead of e.attribute() allows us to get an entity thumbnail if one exists
-                auto icon = qvariant_cast<QIcon>(m_model->data(index, Qt::ItemDataRole::DecorationRole));
-
-                // TODO: request an appropriate thumbnail from thumb manager for the current size of this widget
-                const auto s = rin::fit_under(size(), icon.actualSize(size(), QIcon::Mode::Normal, QIcon::State::On));
-                m_set_thumbnail(icon.pixmap(s));
-            }
-            m_set_name(e.attribute<QString>(Name));
-            m_set_attributes_in_table(e);
-
-            const QString id = e.has_attribute(Id) ? e.attribute<QString>(Id) : m_model->id_for_index(index);
-            const QString q = e.type() == sz::entity_type::File ? "!taglist:file://" + id : "!taglist:" + id;
-
-            if (const QModelIndex node_index = m_model->query(q, false); m_model->valid_index(node_index))
-            { m_watching.insert(node_index); }
-        }
-        m_adjust_widget_geometries();
-        update();
-    }
-
-    void details_panel::set_items(const QList<QModelIndex>& indexes)
-    {
-        clear();
-        m_items = indexes;
-
-        // TODO: thumbnails for selections of items
-
-        update();
-    }
-
-    void details_panel::clear()
-    {
-        m_items.clear();
         m_watching.clear();
-        m_tagview->clear();
         m_info_table->clear();
-        update();
+        m_tagview->clear();
     }
 
-    void details_panel::paintEvent(QPaintEvent* event)
+    void entity_metadata_view::set_entity(const QModelIndex& index)
     {
-        QFrame::paintEvent(event);
-
-        QPainter painter(this);
-        m_name_layout.draw(&painter, m_name_rect.topLeft());
+        clear();
+        m_set_attributes_in_table(m_model->at(index));
+        m_query_for_or_get_tags(index);
     }
 
-    void details_panel::resizeEvent(QResizeEvent* event)
+    void entity_metadata_view::set_tags(const reflexive_entity& e)
     {
-        ui_panel::resizeEvent(event);
+        if (e.has_attribute(Tags))
+        {
+            std::vector<reflexive_entity> tags;
+            
+            for (const QString& tag : e.attribute<tag_set>())
+            { tags.emplace_back(tag, sz::entity_type::Tag, true); }
 
-        m_recenter_thumbnail();
-        m_adjust_widget_geometries();
+            m_tagview->append_tags(tags);
+        }
     }
 
-    void details_panel::mouseMoveEvent(QMouseEvent* event)
+    QSize entity_metadata_view::sizeHint() const
     {
-        ui_panel::mouseMoveEvent(event);
+        // return QSize(parentWidget()->width(), m_info_table->height() + m_padding + m_tagview->height());
+        return QFrame::sizeHint();
     }
 
-    void details_panel::insert_tags(const QModelIndex& parent)
+    void entity_metadata_view::insert_tags(const QModelIndex& node_index)
     {
-        if (m_watching.contains(parent))
+        if (m_watching.contains(node_index))
         {
             m_tagview->clear();
             std::vector<reflexive_entity> tags;
-            for (int i = 0; i < m_model->rowCount(parent); ++i)
+            for (int i = 0; i < m_model->rowCount(node_index); ++i)
             {
-                const reflexive_entity& e = m_model->at(m_model->index(i, 0, parent));
+                const reflexive_entity& e = m_model->at(m_model->index(i, 0, node_index));
                 
                 if (e.type() == sz::entity_type::Tag)
                 { tags.emplace_back(e); }
             }
             m_tagview->append_tags(tags);
-            
+            m_adjust_widget_geometries();
         }
     }
 
-    void details_panel::m_set_attributes_in_table(const reflexive_entity& e)
+    void entity_metadata_view::resizeEvent(QResizeEvent* event)
+    {
+        QFrame::resizeEvent(event);
+        m_adjust_widget_geometries();
+    }
+
+    inline void entity_metadata_view::m_set_attributes_in_table(const reflexive_entity& e)
     {
         using enum entity_attribute_type;
         
@@ -196,6 +151,126 @@ namespace rin
         m_info_table->setColumnWidth(0, qCeil(static_cast<qreal>(w) * m_info_table_attr_name_col_width_ratio));
     }
 
+    inline void entity_metadata_view::m_query_for_or_get_tags(const QModelIndex& index)
+    {
+        const auto& e = m_model->at(index);
+
+        if (e.has_attribute(Tags) && e.attribute<tag_set>().size())
+        { set_tags(e); }
+        else
+        {
+            const QString id = e.has_attribute(Id) ? e.attribute<QString>(Id) : m_model->id_for_index(index);
+            const QString q = e.type() == sz::entity_type::File ? "!taglist:file://" + id : "!taglist:" + id;
+
+            if (const QModelIndex node_index = m_model->query(q, false); m_model->valid_index(node_index))
+            { m_watching.insert(node_index); }
+        }
+    }
+
+    inline void entity_metadata_view::m_adjust_widget_geometries()
+    {
+        int used_height = 0;
+        m_info_table->resizeRowsToContents();
+
+        for (int i = 0; i < m_info_table->rowCount(); ++i)
+        {
+            m_info_table->setRowHeight(i, m_info_table->rowHeight(i) + m_padding);
+            used_height += m_info_table->rowHeight(i);
+        }
+        used_height += m_padding;
+        m_tagview->move(QPoint(0, used_height));
+
+        m_tagview->resize(width(), height() - used_height);
+    }
+
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    details_panel::details_panel(QWidget* parent, entity_model* model) :
+        ui_panel(parent),
+        m_items(), m_model(model),
+        m_thumbnail(nullptr),
+        m_padding(4)
+    {
+        if (!m_model)
+        { throw std::runtime_error("model was nullptr"); }
+
+        m_thumbnail = new ui_image(this, QPixmap());
+        
+        m_name_font = font();
+        m_name_font.setBold(true);
+        m_name_font.setPointSize(m_name_font.pointSize() + 2);
+        
+        m_view = new entity_metadata_view(this, m_model, m_padding);
+    }
+
+    details_panel::~details_panel()
+    {
+    }
+
+    void details_panel::set_item(const QModelIndex& index)
+    {
+        clear();
+        if (m_model->valid_index(index))
+        {
+            const auto& e = m_model->at(index);
+            m_items.push_back(index);
+
+            if (e.has_attribute(Icon))
+            {
+                // calling model->data() instead of e.attribute() allows us to get an entity thumbnail if one exists
+                auto icon = qvariant_cast<QIcon>(m_model->data(index, Qt::ItemDataRole::DecorationRole));
+
+                // TODO: request an appropriate thumbnail from thumb manager for the current size of this widget
+                const auto s = rin::fit_under(size(), icon.actualSize(size(), QIcon::Mode::Normal, QIcon::State::On));
+                m_set_thumbnail(icon.pixmap(s));
+            }
+            m_set_name(e.attribute<QString>(Name));
+
+            m_view->set_entity(index);
+        }
+        m_adjust_widget_geometries();
+        update();
+    }
+
+    // TODO
+    void details_panel::set_items(const QList<QModelIndex>& indexes)
+    {
+        Q_UNUSED(indexes);
+        clear();
+        update();
+    }
+
+    void details_panel::clear()
+    {
+        m_items.clear();
+        m_thumbnail->set_image(QPixmap());
+        m_view->clear();
+        update();
+    }
+
+    void details_panel::paintEvent(QPaintEvent* event)
+    {
+        QFrame::paintEvent(event);
+
+        QPainter painter(this);
+        m_name_layout.draw(&painter, m_name_rect.topLeft());
+    }
+
+    void details_panel::resizeEvent(QResizeEvent* event)
+    {
+        ui_panel::resizeEvent(event);
+
+        m_recenter_thumbnail();
+        m_adjust_widget_geometries();
+    }
+
+    void details_panel::mouseMoveEvent(QMouseEvent* event)
+    {
+        ui_panel::mouseMoveEvent(event);
+    }
+
     void details_panel::m_recenter_thumbnail()
     {
         auto thr = m_thumbnail->rect();
@@ -229,13 +304,8 @@ namespace rin
         m_name_rect.setSize(text_area);
         used_height += text_area.height() + m_padding;
 
-        m_details_splitter->move(QPoint(0, used_height));
-        m_details_splitter->resize(w, height() - used_height);
-
-        m_info_table->resizeRowsToContents();
-
-        for (int i = 0; i < m_info_table->rowCount(); ++i)
-        { m_info_table->setRowHeight(i, m_info_table->rowHeight(i) + m_padding); }
+        m_view->move(QPoint(0, used_height));
+        m_view->resize(w, height() - used_height);
     }
 
     // TODO
