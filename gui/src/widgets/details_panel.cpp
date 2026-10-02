@@ -20,7 +20,7 @@
 
 namespace rin
 {
-    entity_metadata_view::entity_metadata_view(ui_panel* parent, entity_model* model, int padding) :
+    entity_metadata_view::entity_metadata_view(QWidget* parent, entity_model* model, int padding) :
         QFrame(parent), m_model(model), m_info_table(nullptr), m_tagview(nullptr),
         m_info_table_attr_name_col_width_ratio(0.35), m_padding(padding)
     {

@@ -21,7 +21,7 @@ namespace rin
         Q_OBJECT
 
         public:
-        entity_metadata_view(ui_panel* parent, entity_model* model, int padding);
+        entity_metadata_view(QWidget* parent, entity_model* model, int padding);
         ~entity_metadata_view();
 
         void clear();
