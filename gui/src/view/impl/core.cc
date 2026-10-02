@@ -89,6 +89,7 @@ namespace rin
         virtual std::vector<std::tuple<QModelIndex, int>> intersecting_set(const QRect& r, bool do_layout = false) = 0;
         virtual entity_view_layout_descriptor prepare_item_layout() = 0;
         virtual bool do_item_layout(const entity_view_layout_descriptor& info = entity_view_layout_descriptor()) = 0;
+        virtual QSize content_size(const QSize& s) const = 0;
 
         /* pure virtual - driving class utility functions */
         virtual QSize item_size_for_model_index(const QModelIndex& index) const = 0;

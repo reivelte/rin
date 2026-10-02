@@ -80,6 +80,7 @@ namespace rin
         std::vector<std::tuple<QModelIndex, int>> intersecting_set(const QRect& r, bool do_layout = false) override;
         entity_view_layout_descriptor prepare_item_layout() override;
         bool do_item_layout(const entity_view_layout_descriptor& info = entity_view_layout_descriptor()) override;
+        QSize content_size(const QSize& s) const override;
 
         /* requires implementation - driving class utility functions */
         QSize item_size_for_model_index(const QModelIndex& index) const override;
@@ -283,6 +284,13 @@ namespace rin
             }, start_parent, lpos, gpos);
         }
         return gpos >= end;
+    }
+
+    QSize entity_view::list_mode::content_size(const QSize& s) const
+    {
+        // recalculate_content_width();
+        // recalculate_content_height();
+        return QSize(total_content_width, total_content_height);
     }
 
     QSize entity_view::list_mode::item_size_for_model_index(const QModelIndex& index) const

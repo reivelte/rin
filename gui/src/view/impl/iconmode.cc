@@ -25,6 +25,7 @@ namespace rin
         std::vector<std::tuple<QModelIndex, int>> intersecting_set(const QRect& r, bool do_layout = false) override;
         entity_view_layout_descriptor prepare_item_layout() override;
         bool do_item_layout(const entity_view_layout_descriptor& desc = entity_view_layout_descriptor()) override;
+        QSize content_size(const QSize& s) const override;
 
         /* requires implementation - driving class utility functions */
         QSize item_size_for_model_index(const QModelIndex& index) const override;
@@ -42,6 +43,7 @@ namespace rin
         inline int items_per_row() const;
         inline QSize approximate_content_size(size_t item_count) const;
         inline int row_count_for_item_count(int item_count, int column_count) const;
+        inline int layout_linear_wrap(const QRect& r, bool write_layout_data);
 
         std::set<int> intersecting_rows(const QRect& r);
         void do_row_layout(const QRect& r, const int num_cols, const int num_rows);
@@ -199,6 +201,39 @@ namespace rin
         return false;
     }
 
+    QSize entity_view::icon_mode::content_size(const QSize& s) const
+    {
+        using enum entity_view_item_layout_mode;
+        
+        const int count = model->rowCount(root_index);
+        int h = item_min_spacing_y;
+
+        if (layout_mode == Row_Column)
+        {
+            const int num_cols = std::max(s.width() / (item_max_width + item_min_spacing_x), 1);
+            const int num_rows = row_count_for_item_count(count, num_cols);
+
+            int max_h_for_row = 0;
+            for (int i = 0; i < count; ++i)
+            {
+                const int item_height = item_sizes_initialized ? items[i].height() : item_size_from_model(root_index, 0, i).height();
+                max_h_for_row = std::max(max_h_for_row, items[i].height());
+                if (i % num_cols == num_cols - 1)
+                {
+                    h += max_h_for_row + item_min_spacing_y;
+                    max_h_for_row = 0;
+                }
+            }
+        }
+        else if (layout_mode == Wrap)
+        {
+            // this function is effectively const when the passed bool is 'false'
+            h = const_cast<entity_view::icon_mode*>(this)->layout_linear_wrap(QRect(view->viewport()->rect().topLeft(), s), false);
+        }
+        
+        return QSize(s.width(), h);
+    }
+
     QSize entity_view::icon_mode::item_size_for_model_index(const QModelIndex& index) const
     {
         const int row = index.row();
@@ -279,6 +314,47 @@ namespace rin
         return qCeil(static_cast<qreal>(item_count) / static_cast<qreal>(column_count));
     }
 
+    inline int entity_view::icon_mode::layout_linear_wrap(const QRect& r, bool write_layout_data)
+    {
+        const int start = 0;
+        const int end = items.size();
+        const int min_row_x = item_min_spacing_x + item_interior_spacing_x;
+        const int min_x_inc = item_interior_spacing_x;
+        const int min_y_inc = item_min_spacing_y + item_interior_spacing_y;
+        const int spacing_x = item_min_spacing_x;
+        int x = min_row_x;
+        int y = item_min_spacing_y;
+        int y_inc = 0;
+
+        for (int i = start; i < end; ++i)
+        {
+            const QSize item_size = item_sizes_initialized ? items[i].size() : item_size_from_model(root_index, 0, i);
+            const int w = item_size.width() + spacing_x + min_x_inc;
+
+            if (x + w >= r.right())
+            {
+                // wrap to next line
+                x = min_row_x;
+                y += y_inc + min_y_inc;
+                y_inc = 0;
+            }
+
+            y_inc = std::max(y_inc, item_size.height());
+
+            if (write_layout_data)
+            {
+                if (item_sizes_initialized)
+                { items[i].move(x, y); }
+                else
+                { items[i].set_geometry(x, y, item_size.width(), item_size.height()); }
+
+                bsp.push(items[i].rect(), i);
+            }
+            x += w;
+        }
+        return y + item_max_height;
+    }
+
     std::set<int> entity_view::icon_mode::intersecting_rows(const QRect& r)
     {
         std::set<int> indexes;
@@ -356,35 +432,8 @@ namespace rin
     // WIP
     bool entity_view::icon_mode::layout_wrap(const entity_view_layout_descriptor& desc)
     {
-        const QRect r = view->viewport()->rect();
-        const int start = 0;
-        const int end = items.size();
-        const int min_row_x = item_min_spacing_x + item_interior_spacing_x;
-        const int min_x_inc = item_interior_spacing_x;
-        const int min_y_inc = item_min_spacing_y + item_interior_spacing_y;
-        const int spacing_x = item_min_spacing_x;
-        int x = min_row_x;
-        int y = item_min_spacing_y;
-        int y_inc = 0;
-
-        for (int i = start; i < end; ++i)
-        {
-            const int w = items[i].width() + spacing_x + min_x_inc;
-
-            if (x + w >= r.right())
-            {
-                // wrap to next line
-                x = min_row_x;
-                y += y_inc + min_y_inc;
-                y_inc = 0;
-            }
-
-            y_inc = std::max(y_inc, items[i].height());
-
-            items[i].move(x, y);
-            bsp.push(items[i].rect(), i);
-            x += w;
-        }
+        Q_UNUSED(desc);
+        layout_linear_wrap(view->viewport()->rect(), true);
         return true;
     }
 

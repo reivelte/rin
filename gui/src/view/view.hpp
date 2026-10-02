@@ -41,6 +41,7 @@ namespace rin
         int minimum_item_spacing_x() const;
         int minimum_item_spacing_y() const;
         QRect outline_rect(const QModelIndex& index) const;
+        QSize content_size(const QSize& s) const;
 
         //reimplemented public functions
         void setModel(QAbstractItemModel* model) override;

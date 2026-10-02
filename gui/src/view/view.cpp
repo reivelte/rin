@@ -251,6 +251,11 @@ namespace rin
         return m->map_to_viewport(m->outline_rect(index));
     }
 
+    QSize entity_view::content_size(const QSize& s) const
+    {
+        return m->content_size(s);
+    }
+
     void entity_view::setModel(QAbstractItemModel* model)
     {
         if (model == nullptr)
@@ -1101,65 +1106,65 @@ namespace rin
         else if (viewmode() == entity_view_mode::Icon && (parent == m->root_index))
         {
             // there is a chance the column count was not set yet, let's check now
-            auto* iv = m->as<icon_mode*>();
-            if (std::cmp_not_equal(iv->items_per_row(), iv->items.column_count()))
-            {
-                // don't bother inserting new data now. a full row layout, tree creation, and item size read needs to happen anyways
-                scheduleDelayedItemsLayout();
-                return;
-            }
+            // auto* iv = m->as<icon_mode*>();
+            // if (std::cmp_not_equal(iv->items_per_row(), iv->items.column_count()))
+            // {
+            //     // don't bother inserting new data now. a full row layout, tree creation, and item size read needs to happen anyways
+            //     scheduleDelayedItemsLayout();
+            //     return;
+            // }
 
-            qDebug() << "entity_view: doing dynamic item insert: [start: " << start << ", end: " << end << "] parent: " << parent;
-            const int num_cols = static_cast<int>(iv->items.column_count());
-            const int num_rows = iv->row_count_for_item_count(m->view_loaded_items + ((end + 1) - start), num_cols);
-            const int new_rows_to_add = num_rows - static_cast<int>(iv->rows.size());
+            // qDebug() << "entity_view: doing dynamic item insert: [start: " << start << ", end: " << end << "] parent: " << parent;
+            // const int num_cols = static_cast<int>(iv->items.column_count());
+            // const int num_rows = iv->row_count_for_item_count(m->view_loaded_items + ((end + 1) - start), num_cols);
+            // const int new_rows_to_add = num_rows - static_cast<int>(iv->rows.size());
 
-            if (!iv->bsp.initialized()) // we only check one because both trees are always cleared and created together
-            { iv->init_trees(viewport()->rect(), m->model->rowCount(parent)); }
+            // if (!iv->bsp.initialized()) // we only check one because both trees are always cleared and created together
+            // { iv->init_trees(viewport()->rect(), m->model->rowCount(parent)); }
             
-            if (new_rows_to_add)
-            {
-                // add them in now
-                iv->rows.resize(num_rows);
-                iv->items.resize(num_rows);
-            }
+            // if (new_rows_to_add)
+            // {
+            //     // add them in now
+            //     iv->rows.resize(num_rows);
+            //     iv->items.resize(num_rows);
+            // }
 
-            const auto [min_row_x, spacing_x] = iv->minimum_row_x(viewport()->rect(), num_cols);
-            const int row_width = iv->default_row_width(num_cols, spacing_x);
-            const int start_row = start / num_cols;
-            int h = iv->rows[start_row].height; // 0 if the first item to insert is leading the row
-            int y = (start_row == 0 ? m->item_min_spacing_y : iv->rows[start_row - 1].rect.bottom() + m->item_min_spacing_y);
+            // const auto [min_row_x, spacing_x] = iv->minimum_row_x(viewport()->rect(), num_cols);
+            // const int row_width = iv->default_row_width(num_cols, spacing_x);
+            // const int start_row = start / num_cols;
+            // int h = iv->rows[start_row].height; // 0 if the first item to insert is leading the row
+            // int y = (start_row == 0 ? m->item_min_spacing_y : iv->rows[start_row - 1].rect.bottom() + m->item_min_spacing_y);
 
-            for (int i = start; i < (end + 1); ++i)
-            {
-                const int row_idx = i / num_cols;
-                const int col_idx = i % num_cols;
-                const QSize s = m->item_size_from_model(parent, 0, i);
-                iv->items[i].resize(s);
-                h = s.height() > h ? s.height() : h;
-                m->view_loaded_items += 1;
-                if (col_idx == num_cols - 1 || (i == end))
-                {
-                    // we need to layout any new rows and add them to the tree
-                    if (iv->bsp_rows.contains(row_idx))
-                    { iv->bsp_rows.remove(iv->rows[row_idx].rect, row_idx); }
+            // for (int i = start; i < (end + 1); ++i)
+            // {
+            //     const int row_idx = i / num_cols;
+            //     const int col_idx = i % num_cols;
+            //     const QSize s = m->item_size_from_model(parent, 0, i);
+            //     iv->items[i].resize(s);
+            //     h = s.height() > h ? s.height() : h;
+            //     m->view_loaded_items += 1;
+            //     if (col_idx == num_cols - 1 || (i == end))
+            //     {
+            //         // we need to layout any new rows and add them to the tree
+            //         if (iv->bsp_rows.contains(row_idx))
+            //         { iv->bsp_rows.remove(iv->rows[row_idx].rect, row_idx); }
                     
-                    // apply the layout for this row
-                    entity_view_item_row& row = iv->rows[row_idx];
-                    row.height = h;
-                    row.rect = QRect(QPoint(min_row_x, y), QSize(row_width, row.height));
-                    row.index = static_cast<size_t>(row_idx) * num_cols;
-                    row.count = col_idx + 1;
-                    row.hidden = false;
-                    iv->bsp_rows.push(row.rect, row_idx);
-                    y += (row.height + m->item_min_spacing_y);
-                    h = 0;
-                }
-            }
+            //         // apply the layout for this row
+            //         entity_view_item_row& row = iv->rows[row_idx];
+            //         row.height = h;
+            //         row.rect = QRect(QPoint(min_row_x, y), QSize(row_width, row.height));
+            //         row.index = static_cast<size_t>(row_idx) * num_cols;
+            //         row.count = col_idx + 1;
+            //         row.hidden = false;
+            //         iv->bsp_rows.push(row.rect, row_idx);
+            //         y += (row.height + m->item_min_spacing_y);
+            //         h = 0;
+            //     }
+            // }
             
-            m->total_content_height = m->item_min_spacing_y;
-            for (const auto& row : iv->rows)
-            { m->total_content_height += (row.height + m->item_min_spacing_y); }
+            // m->total_content_height = m->item_min_spacing_y;
+            // for (const auto& row : iv->rows)
+            // { m->total_content_height += (row.height + m->item_min_spacing_y); }
 
         } // if (viewmode() == entity_view_mode::Icon)
 
