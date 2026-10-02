@@ -27,8 +27,15 @@ namespace rin
     void ui_image::set_image(const QPixmap& img)
     {
         m_image = img;
-        m_aspect = static_cast<qreal>(img.width()) / static_cast<qreal>(img.height());
-        resize(img.width(), img.height());
+        if (m_image.isNull())
+        {
+            resize(0, 0);
+        }
+        else
+        {
+            m_aspect = static_cast<qreal>(img.width()) / static_cast<qreal>(img.height());
+            resize(img.width(), img.height());
+        }
         update();
     }
 
