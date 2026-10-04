@@ -45,10 +45,11 @@ namespace rin
                 switch (sort_key)
                 {
                 case Name:
+                case File_Type:
                 {
-                    return ascending ?
-                        QString::localeAwareCompare(name_a, name_b) > -1 :
-                        QString::localeAwareCompare(name_a, name_b) == -1;
+                    const auto val_a = a.attribute<QString>(sort_key);
+                    const auto val_b = b.attribute<QString>(sort_key);
+                    return ascending ? QString::localeAwareCompare(val_a, val_b) < 0 : QString::localeAwareCompare(val_a, val_b) > 0;
                 }
                 case Size:
                 case Created:
@@ -62,14 +63,6 @@ namespace rin
                         return ascending ? val_a < val_b : val_a > val_b;
                     }
                     break;
-                }
-                case File_Type:
-                {
-                    const auto ft_a = a.attribute<QString>(File_Type);
-                    const auto ft_b = b.attribute<QString>(File_Type);
-                    return ascending ?
-                        QString::localeAwareCompare(ft_a, ft_b) > -1 :
-                        QString::localeAwareCompare(ft_a, ft_b) == -1;
                 }
                 default:
                     qDebug() << "rin::sort_entities: sort by" << sz::utility::to_string(sort_key) << "not implemented";
