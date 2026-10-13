@@ -20,35 +20,10 @@
 #include <QtGui/QIcon>
 #include <suzuri/entity/database.hpp>
 #include <suzuri/entity/common.hpp>
+#include "common.hpp"
 
 namespace rin
 {
-    enum class entity_attribute_type : int
-    {
-        // applies to all entities
-        Null_Attribute = 0,
-        Name = 1,               // string
-        Id,                     // string
-        Parent_Id,              // string
-        Tags,                   // set<string>
-        Comments, Description,  // string
-        Color,                  // int
-        Url,                    // QUrl
-
-        // applies to filesystem based entities
-        Size, Modified, Created, Accessed, File_Type,       // string
-        Size_Int, Modified_Int, Created_Int, Accessed_Int,  // qint64
-        Rating,                                             // int
-        Icon,                                               // QIcon
-        File_Info,                                          // QFileInfo
-        Mime_Type,                                          // QMimeType
-
-        // applies to filesystem based image entities
-        Sizehint,               // tuple<int, int> or similar
-
-        // TODO: fields for specfic file types and entities
-    };
-
     typedef std::unordered_set<QString> tag_set;
     typedef std::variant<
         tag_set,
@@ -96,6 +71,8 @@ namespace rin
         explicit entity_attribute(const std::string& text) : base(QString::fromStdString(text)) {}
     };
 
+    typedef std::unordered_map<entity_attribute_type, entity_attribute> entity_attribute_map;
+
     #define ENT_ATTR_TMPL(X) template <is_valid_entity_attribute_type X>
     
     class reflexive_entity
@@ -117,7 +94,7 @@ namespace rin
         ENT_ATTR_TMPL(T) const T& attribute(entity_attribute_type attr = entity_attribute_type::Null_Attribute) const;
         ENT_ATTR_TMPL(T) T& attribute(entity_attribute_type attr = entity_attribute_type::Null_Attribute);
 
-        inline const std::unordered_map<entity_attribute_type, entity_attribute>& attribute_map() const;
+        inline const entity_attribute_map& attribute_map() const;
 
         inline int key() const;
         inline int parent_key() const;
@@ -130,7 +107,7 @@ namespace rin
 
         private:
         using enum entity_attribute_type;
-        std::unordered_map<entity_attribute_type, entity_attribute> m_attributes;
+        entity_attribute_map m_attributes;
         sz::entity_type m_type;
         int m_parent;
         int m_self;
@@ -218,7 +195,7 @@ namespace rin
         return std::get<T>(a);
     }
 
-    inline const std::unordered_map<entity_attribute_type, entity_attribute>& reflexive_entity::attribute_map() const
+    inline const entity_attribute_map& reflexive_entity::attribute_map() const
     {
         return m_attributes;
     }

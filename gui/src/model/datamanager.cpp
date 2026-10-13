@@ -6,6 +6,7 @@
 #include <QtCore/QEvent>
 #include <QtCore/QCoreApplication>
 #include <suzuri/utility/string.hpp>
+#include <suzuri/utility/thumbnail.hpp>
 #include <suzuri/metadata/tags.hpp>
 #include "datamanager.hpp"
 
@@ -664,10 +665,9 @@ namespace rin
             item.set_has_children(fsinfo.isDir());
             item.set_attribute(File_Info, fsinfo);
         }
-        if (thumbnail_manager::has_thumbnail(id))
+        if (sz::supported_extensions().contains(fsinfo.suffix().toLower().toStdString()))
         {
-            // TODO: thumbnail_manager should return the size for us
-            item.set_attribute(Sizehint, QImageReader(id).size());
+            item.set_attribute(Sizehint, QImageReader(fsinfo.absoluteFilePath()).size());
         }
         if (fill_extended_attributes)
         {

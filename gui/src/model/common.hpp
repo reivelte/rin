@@ -5,15 +5,46 @@
 #pragma once
 #include <cstdint>
 #include <optional>
+#include <QtCore/QSize>
 #include <QtCore/QString>
 #include <QtCore/QUrl>
 #include <QtCore/QFileInfo>
+#include <QtCore/QDir>
+#include <QtGui/QPixmap>
 #include <suzuri/metadata/tags.hpp>
-#include "entity.hpp"
+#include <suzuri/utility/thumbnail.hpp>
 
 namespace rin
 {
     struct entity_tree_node;
+    class reflexive_entity;
+
+    enum class entity_attribute_type : int
+    {
+        // applies to all entities
+        Null_Attribute = 0,
+        Name = 1,               // string
+        Id,                     // string
+        Parent_Id,              // string
+        Tags,                   // set<string>
+        Comments, Description,  // string
+        Color,                  // int
+        Url,                    // QUrl
+
+        // applies to filesystem based entities
+        Size, Modified, Created, Accessed, File_Type,       // string
+        Size_Int, Modified_Int, Created_Int, Accessed_Int,  // qint64
+        Rating,                                             // int
+        Icon,                                               // QIcon
+        File_Info,                                          // QFileInfo
+        Mime_Type,                                          // QMimeType
+
+        // applies to filesystem based image entities
+        Sizehint,               // tuple<int, int> or similar
+
+        // TODO: fields for specfic file types and entities
+    };
+
     struct node_index_change
     {
         int key;
@@ -82,27 +113,7 @@ namespace rin
         }
 
         // size is not modified here
-        void adjust(const reflexive_entity& e, bool increment)
-        {
-            using enum entity_attribute_type;
-            using enum sz::entity_type;
-            const int adj = increment ? 1 : -1;
-            if (e.type() == File)
-            {
-                if (const auto& fsinfo = e.attribute<QFileInfo>(File_Info); fsinfo.isDir())
-                { dir_count += adj; }
-                else
-                {
-                    file_count += adj;
-                    if (increment)
-                    { filesize += static_cast<uintmax_t>(fsinfo.size()); }
-                    else
-                    { filesize -= static_cast<uintmax_t>(fsinfo.size()); }
-                }
-            }
-            else if (e.type() == Tag || e.type() == Alias)
-            { tag_count += adj; }
-        }
+        void adjust(const reflexive_entity& e, bool increment);
     };
 
     enum class fetch_action : unsigned int
@@ -128,6 +139,17 @@ namespace rin
     {
         query_descriptor query;
         sz::metadata::parameters args;
+    };
+
+    struct thumbnail_descriptor
+    {
+        QPixmap thumbnail;   // filled in by thumbnail_manager
+        QString id;
+        QString entity_name;
+        QSize original_size; // only if the entity refers to a media file on disk (jpg, png, etc.), see entity.Sizehint
+        sz::thumbnail_target_size target_size;
+        sz::entity_type entity_type;
+        int node_key;
     };
 
     void sort_entities(entity_tree_node& node);

@@ -15,7 +15,6 @@
 #include <QtGui/QImageReader>
 #include <suzuri/utility/string.hpp>
 #include "entitymodel.hpp"
-#include "thumbnailmanager.hpp"
 
 namespace rin
 {
@@ -24,23 +23,17 @@ namespace rin
 
     entity_model::entity_model(QObject* parent, const std::filesystem::path& database_path) :
         QAbstractItemModel(parent), 
-        m_dataman(std::make_unique<entity_data_manager>(database_path)), m_database_path(database_path),
-        m_thumbman(),
+        m_dataman(std::make_unique<entity_data_manager>(database_path)),
+        m_thumbman(std::make_unique<thumbnail_manager>(database_path)),
+        m_database_path(database_path),
         m_tree(),
         m_thumbnails(), m_items_pending_update(),
         m_pending_queries(), m_delayed_sorts(), m_pending_query_timer(), m_delayed_sort_timer(),
         m_root(std::nullopt), m_sort_column(std::nullopt), m_sort_order(std::nullopt),
-        m_thumbnail_target_size(256, 256),
+        m_thumbnail_target_size(sz::thumbnail_target_size::Normal_128px),
         m_batchsize(100),
         m_readonly(true)
     {
-        auto* thumbman = new thumbnail_manager;
-        thumbman->moveToThread(&m_thumbman);
-        connect(&m_thumbman, &QThread::finished, thumbman, &QObject::deleteLater);
-        connect(this, &entity_model::need_thumbnails, thumbman, &thumbnail_manager::generate_thumbnails);
-        connect(thumbman, &thumbnail_manager::thumbnails_generated, this, &entity_model::set_thumbnails);
-        m_thumbman.start();
-
         auto* dataman = m_dataman.get();
         connect(
             dataman,
@@ -71,6 +64,10 @@ namespace rin
         connect(dataman, &entity_data_manager::fetch_failed, this, &entity_model::handle_fetch_failure);
 
         m_dataman->set_watcher_enabled(true);
+        
+        auto* thumbman = m_thumbman.get();
+        connect(thumbman, &thumbnail_manager::thumbnail_available, this, &entity_model::set_thumbnail);
+        
         set_display_attributes({
             Name, Size, Modified, File_Type
         });
@@ -79,15 +76,19 @@ namespace rin
 
     entity_model::~entity_model()
     {
-        m_dataman->request_abort();
-        if (!m_dataman->wait(1000))
+        // if/when manager threads inherit a common base, we should constrain the template here
+        auto quit_thread = []<typename T>(std::unique_ptr<T>& thread) -> void
         {
-            auto* dataman = m_dataman.release();
-            dataman->deleteLater();
-        }
+            thread->request_abort();
+            if (!thread->wait(1000))
+            {
+                auto* t = thread.release();
+                t->deleteLater();
+            }
+        };
 
-        m_thumbman.quit();
-        m_thumbman.wait();   
+        quit_thread(m_dataman);
+        quit_thread(m_thumbman);
     }
 
     void entity_model::set_batchsize(size_t size)
@@ -105,6 +106,8 @@ namespace rin
         // TODO: mark all nodes for rescan
         m_dataman->clear();
         m_dataman->set_database(path);
+        clear_thumbnails();
+        m_thumbman->set_database(path);
     }
 
     void entity_model::set_display_attributes(const std::vector<entity_attribute_type>& attrs)
@@ -303,31 +306,37 @@ namespace rin
 
     void entity_model::clear_thumbnails()
     {
-        // if invoked from set_thumbnail, dataChanged is emitted after determining which items need thumbnails
-        // otherwise, the signal will be emitted when the model receives a new thumbnail from thumbman
+        // dataChanged will be emitted when the model receives a new thumbnail from thumbman
+        m_thumbman->clear();
         m_thumbnails.clear();
     }
 
     // expects all indexes to be valid
-    void entity_model::request_thumbnails(const std::vector<QModelIndex>& indexes, const std::vector<QSize>& sizes)
-    {
-        if (sizes.size() != indexes.size())
-        {
-            qWarning() << "entity_model::request_thumbnails: mismatch between indexes and sizes for indexes";
-        }
-        std::vector<std::tuple<QString, QModelIndex, QSize>> jobs;
-        std::vector<QSize> sizes_to_submit;
-        
-        int i = 0;
+    void entity_model::request_thumbnails(const QList<QModelIndex>& indexes, sz::thumbnail_target_size size)
+    {   
+        std::vector<thumbnail_descriptor> batch;
         for (const auto& index : indexes)
         {
-            if (const auto& item = m_item_for_index(index); item.has_attribute(Sizehint))
+            if (const auto& e = m_item_for_index(index); e.has_attribute(Sizehint))
             {
-                jobs.emplace_back(m_id_for_index(index), index, sizes[i]);
+                const auto& name = e.attribute<QString>(Name);
+                const int key = m_key_for_index(index);
+                
+                if (m_has_thumbnail_loaded(name, key))
+                { continue; }
+
+                batch.emplace_back(thumbnail_descriptor{
+                    .thumbnail{},
+                    .id = e.has_attribute(Id) ? e.attribute<QString>(Id) : id_for_index(index),
+                    .entity_name = name,
+                    .original_size = e.attribute<QSize>(Sizehint),
+                    .target_size = size,
+                    .entity_type = e.type(),
+                    .node_key = key
+                });
             }
-            ++i;
         }
-        emit need_thumbnails(jobs);
+        m_thumbman->submit_batch(batch);
     }
 
     bool entity_model::valid_index(const QModelIndex& index)
@@ -348,32 +357,33 @@ namespace rin
         return e.has_attribute(Icon);
     }
 
-    QPixmap entity_model::thumbnail(const QModelIndex& index) const
+    QPixmap entity_model::thumbnail(const reflexive_entity& e, sz::thumbnail_target_size size) const
     {
-        if (index.isValid())
+        const auto name = e.attribute<QString>(Name);
+        const int key = e.parent_key();
+        
+        if (m_has_thumbnail_loaded(name, key, size))
         {
-            const auto& n = m_node_for_index(index);
-            const auto& e = m_item_for_index(index);
-            const auto name = e.attribute<QString>(Name);
-            
-            if (m_thumbnails.contains(n.key) && m_thumbnails.at(n.key).contains(name))
-            { return m_thumbnails.at(n.key).at(name); }
+            return m_thumbnail_for_entity(name, key, size);
         }
+
         return QPixmap();
     }
 
     QPixmap entity_model::thumbnail(const reflexive_entity& e) const
     {
-        const int k = e.parent_key();
-        const auto name = e.attribute<QString>();
-        
-        if (m_thumbnails.contains(k) && m_thumbnails.at(k).contains(name))
-        { return m_thumbnails.at(k).at(name); }
+        return thumbnail(e, m_thumbnail_target_size);
+    }
+
+    QPixmap entity_model::thumbnail(const QModelIndex& index) const
+    {
+        if (index.isValid())
+        { return thumbnail(m_item_for_index(index)); }
         
         return QPixmap();
     }
 
-    bool entity_model::has_thumbnail(const QModelIndex &index) const
+    bool entity_model::has_thumbnail(const QModelIndex& index) const
     {
         if (m_valid_index(index) && index.row() != -1 && index.column() == 0)
         {
@@ -382,10 +392,20 @@ namespace rin
         return false;
     }
 
-    bool entity_model::thumbnail_loaded(const QModelIndex& index) const
+    bool entity_model::has_thumbnail_loaded(const QModelIndex& index, sz::thumbnail_target_size size) const
     {
-        const int key = m_key_for_index(index);
-        return m_thumbnails.contains(key) && m_thumbnails.at(key).contains(m_tree[key].positions[index.row()]);
+        if (m_valid_index(index) && index.row() != -1 && index.column() == 0)
+        {
+            const int key = m_key_for_index(index);
+            const QString name = m_tree[key].positions[index.row()];
+            return m_has_thumbnail_loaded(name, key, size);
+        }
+        return false;
+    }
+
+    bool entity_model::has_thumbnail_loaded(const QModelIndex& index) const
+    {
+        return has_thumbnail_loaded(index, m_thumbnail_target_size);
     }
 
     QModelIndex entity_model::root_index() const
@@ -518,15 +538,16 @@ namespace rin
 
         case Qt::DecorationRole:
         {
+            const QString& name = item.attribute<QString>(Name);
             const int key = item.parent_key();
-            if (m_thumbnails.contains(key) && m_thumbnails.at(key).contains(item.attribute<QString>(Name)))
+            if (m_has_thumbnail_loaded(name, key))
             {
-                return QIcon(m_thumbnail_for_index(index));
+                return QIcon(m_thumbnail_for_entity(name, key));
             }
             else if (item.has_attribute(Sizehint))
             {
                 auto* this_ = const_cast<entity_model*>(this);
-                emit this_->need_thumbnails({{m_id_for_index(index), QModelIndex(index), rin::fit_under(m_thumbnail_target_size, item.attribute<QSize>(Sizehint))}});
+                this_->request_thumbnails({index}, m_thumbnail_target_size);
             }
 
             if (item.has_attribute(Icon))
@@ -549,7 +570,6 @@ namespace rin
             if (item.has_attribute(Sizehint))
             { return item.attribute<QSize>(Sizehint); }
             
-            // delegate always expects to get a QSize when querying the size hint role
             return QSize();
         }
         
@@ -875,13 +895,9 @@ namespace rin
         };
     }
 
-    void entity_model::set_thumbnail_target_size(const QSize& size)
+    void entity_model::set_thumbnail_target_size(sz::thumbnail_target_size size)
     {
-        if (m_thumbnail_target_size == size)
-        { return; }
-
         m_thumbnail_target_size = size;
-        clear_thumbnails();
     }
 
     void entity_model::set_sort_preference(int column, Qt::SortOrder order)
@@ -1121,22 +1137,19 @@ namespace rin
         }
     }
 
-    void entity_model::set_thumbnails(const std::vector<std::tuple<QString, QModelIndex, QPixmap>>& data)
+    void entity_model::set_thumbnail(const thumbnail_descriptor& data)
     {
-        for (const auto& [id, idx, thumb] : data)
-        {
-            const auto& item = m_item_for_index(idx);
-            if (
-                (item.type() == sz::entity_type::File && item.attribute<QFileInfo>(File_Info).absoluteFilePath() == id) ||
-                (item.attribute<QString>(Name) == id)
-            )
-            {
-                const int key = m_key_for_index(idx);
-                const int i = idx.row();
-                m_thumbnails[key][m_tree[key].positions[i]] = thumb;
-                emit dataChanged(idx, idx, {Qt::DecorationRole});
-            }
-        }
+        const int key = data.node_key;
+        m_thumbnails[key][data.entity_name][data.target_size] = data.thumbnail;
+
+        // rather than call tree.index_of() for every individual entity, it's faster to just tell views that the entire node has changed in some way
+        // as of 2026/10/06, entity_view always does a full repaint regardless of which index was changed
+        const int last_idx = m_tree[key].size() - 1;
+        const QModelIndex first = m_index_for_item(m_tree[key][0], 0);
+        const QModelIndex last = m_index_for_item(m_tree[key][last_idx], last_idx);
+        
+        emit thumbnail_available(m_tree[key][data.entity_name], data.target_size);
+        emit dataChanged(first, last, {Qt::DecorationRole});
     }
 
     void entity_model::finalize_query(query_descriptor qd)
@@ -1643,11 +1656,27 @@ namespace rin
         return id.startsWith("concept://") && m_tree.contains(id);
     }
 
-    // does no checks
-    inline const QPixmap& entity_model::m_thumbnail_for_index(const QModelIndex& index) const
+    inline bool entity_model::m_has_thumbnail_loaded(const QString &name, const int node_key, sz::thumbnail_target_size size) const
     {
-        const int key = m_key_for_index(index);
-        return m_thumbnails.at(key).at(m_tree[key].positions[index.row()]);
+        return m_thumbnails.contains(node_key) &&
+        m_thumbnails.at(node_key).contains(name) &&
+        m_thumbnails.at(node_key).at(name).contains(size);
+    }
+
+    inline bool entity_model::m_has_thumbnail_loaded(const QString& name, const int node_key) const
+    {
+        return m_has_thumbnail_loaded(name, node_key, m_thumbnail_target_size);
+    }
+
+    inline const QPixmap& entity_model::m_thumbnail_for_entity(const QString& name, const int node_key, sz::thumbnail_target_size size) const
+    {
+        return m_thumbnails.at(node_key).at(name).at(size);
+    }
+
+    // does no checks
+    inline const QPixmap& entity_model::m_thumbnail_for_entity(const QString& name, const int node_key) const
+    {
+        return m_thumbnail_for_entity(name, node_key, m_thumbnail_target_size);
     }
 
     inline void entity_model::m_async_sort(int key, int column, Qt::SortOrder order)

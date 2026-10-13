@@ -10,6 +10,12 @@
 
 namespace sz::utility
 {
+    enum class hash_type : int
+    {
+        MD5, SHA256
+    };
+
+    SZ_API std::string hash(std::string_view data, hash_type type);
     SZ_API std::string sha256(std::string_view in);
     SZ_API std::string sha256_from_stat(const std::filesystem::path& path);
 

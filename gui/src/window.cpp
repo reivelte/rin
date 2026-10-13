@@ -21,6 +21,7 @@
 #include <QtGui/QImageReader>
 #include <QtGui/QFileSystemModel>
 #include <QtGui/QContextMenuEvent>
+#include <suzuri/utility/thumbnail.hpp>
 #include "window.hpp"
 #include "view/view.hpp"
 #include "widgets/navigationpanel.hpp"
@@ -166,7 +167,9 @@ namespace rin
         m_listmode_toggle->setIcon(QIcon::fromTheme("view-list-tree"));
 
         m_icon_sizer = new icon_sizer(this);
-        m_icon_sizer->setValue(m_view->iconSize().height());
+        
+        // ensure thumbnails render at correct size on startup
+        update_icon_size(m_view->iconSize());
         
         m_status_bar = statusBar();
         m_status_bar->addPermanentWidget(m_iconmode_toggle);
@@ -185,10 +188,12 @@ namespace rin
         connect(m_view, &entity_view::navigate_request, this, &main_window::navigate);
         connect(m_view, &entity_view::activated, this, &main_window::open_item);
         connect(m_view, &entity_view::selected_count_changed, this, &main_window::update_status_view_selected_counts);
-        connect(m_view, &entity_view::iconSizeChanged, this, &main_window::update_iconsizer);
         connect(m_view, &entity_view::rightclicked, this, &main_window::handle_view_rightclick);
         connect(m_view, &entity_view::expanded, this, &main_window::update_status_view_counts);
         connect(m_view, &entity_view::collapsed, this, &main_window::update_status_view_counts);
+        connect(m_view, &entity_view::iconSizeChanged, this, &main_window::update_icon_size);
+        connect(m_view, &entity_view::iconSizeChanged, m_model, &entity_model::clear_thumbnails);
+        
         connect(m_model, &entity_model::rowsInserted, this, &main_window::update_status_view_counts);
         connect(m_model, qOverload<const QModelIndex&>(&entity_model::query_done), this, &main_window::update_status_view_counts);
 
@@ -341,9 +346,11 @@ namespace rin
         m_view->set_iconsize(QSize(size, size));
     }
 
-    void main_window::update_iconsizer(const QSize& size)
+    void main_window::update_icon_size(const QSize& size)
     {
-        m_icon_sizer->setValue(size.height());
+        const auto [w, h] = size;
+        m_icon_sizer->setValue(h);
+        m_model->set_thumbnail_target_size(sz::to_thumbnail_target_size(w, h));
     }
 
     // TODO: handle when multiple items are selected in view

@@ -10,6 +10,7 @@
 #include <QtCore/QString>
 #include <suzuri/result.hpp>
 #include "common.hpp"
+#include "entity.hpp"
 
 namespace rin
 {

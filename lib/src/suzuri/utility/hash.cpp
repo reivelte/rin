@@ -9,11 +9,25 @@
 
 namespace sz::utility
 {
+    std::string hash(std::string_view data, hash_type type)
+    {
+        using enum hash_type;
+        std::string_view algo;
+        switch (type)
+        {
+        default:
+        case SHA256: { algo = "SHA-256"; break; }
+        case MD5: { algo = "MD5"; break; }
+        }
+
+        auto h = Botan::HashFunction::create(algo);
+        h->update(data);
+        return Botan::hex_encode(h->final(), false);
+    }
+
     std::string sha256(std::string_view in)
     {
-        auto hash = Botan::HashFunction::create("SHA-256");
-        hash->update(in);
-        return Botan::hex_encode(hash->final(), false);
+        return hash(in, hash_type::SHA256);
     }
 
     std::string sha256_from_stat(const std::filesystem::path& path)

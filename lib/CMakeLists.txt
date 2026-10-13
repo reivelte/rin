@@ -80,6 +80,7 @@ set(public_headers #!BEGIN: HEADER LIST
   src/${PROJECT_NAME}/utility/hash.hpp
   src/${PROJECT_NAME}/utility/string.hpp
   src/${PROJECT_NAME}/utility/domain.hpp
+  src/${PROJECT_NAME}/utility/thumbnail.hpp
   src/${PROJECT_NAME}/utility/config_utils.hpp
   src/${PROJECT_NAME}/utility/json.hpp
   src/${PROJECT_NAME}/metadata/tags.hpp
@@ -95,6 +96,7 @@ set(sources #!BEGIN: SOURCE LIST
   src/${PROJECT_NAME}/utility/string.cpp
   src/${PROJECT_NAME}/utility/files.cpp
   src/${PROJECT_NAME}/utility/hash.cpp
+  src/${PROJECT_NAME}/utility/thumbnail.cpp
   src/${PROJECT_NAME}/utility/domain.cpp
   src/${PROJECT_NAME}/utility/config_utils.cpp
   src/${PROJECT_NAME}/utility/json.cpp

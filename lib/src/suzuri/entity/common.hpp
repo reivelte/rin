@@ -9,6 +9,10 @@
 
 namespace sz
 {
+    // an entity id is a platform agnostic path without a prefix
+    // an entity uri is a platform agnostic path with a prefix
+    // an entity platform id (pid) is a platform specific path without a prefix
+
     constexpr int ENTITY_TOTAL_COLUMN_COUNT = 4;
     constexpr int ENTITY_MUTABLE_COLUMN_COUNT = 3;
 
@@ -33,6 +37,13 @@ namespace sz
     typedef size_t entity_index;
     typedef size_t attribute_index;
 
+    static constexpr const std::string_view FILE_URI_PREFIX =    "file://";
+    static constexpr const std::string_view TAG_URI_PREFIX =     "tag://";
+    static constexpr const std::string_view CONCEPT_URI_PREFIX = "concept://";
+    static constexpr const std::string_view HTTPS_URI_PREFIX =   "https://";
+
     SZ_API bool is_valid_tag(const std::string& tag);
+    SZ_API std::string entity_uri(const std::string& id, entity_type type);
+    SZ_API std::string entity_platform_id(const std::string& id, entity_type type);
     
 } // namespace sz

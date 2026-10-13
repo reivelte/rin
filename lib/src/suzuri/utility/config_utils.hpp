@@ -17,7 +17,7 @@ namespace sz
 {
     enum class data_directory_type : int
     {
-        Config, Data, State
+        Config, Data, State, Cache
     };
 
     enum class config_type : int

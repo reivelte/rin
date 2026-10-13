@@ -16,11 +16,13 @@
 #include <QtWidgets/QFileIconProvider>
 #include <QtGui/QIcon>
 #include <suzuri/result.hpp>
+#include <suzuri/utility/thumbnail.hpp>
 #include "../rin.hpp"
 #include "../utility/sizing.hpp"
 #include "entity.hpp"
 #include "tree.hpp"
 #include "datamanager.hpp"
+#include "thumbnailmanager.hpp"
 
 namespace rin
 {
@@ -84,14 +86,16 @@ namespace rin
         void clear(const QModelIndex& parent);
         
         void clear_thumbnails();
-        void request_thumbnails(const std::vector<QModelIndex>& indexes, const std::vector<QSize>& sizes);
+        void request_thumbnails(const QList<QModelIndex>& indexes, sz::thumbnail_target_size size);
 
         bool valid_index(const QModelIndex& index);
         bool extended_information_loaded(const QModelIndex& index) const;
-        QPixmap thumbnail(const QModelIndex& index) const;
+        QPixmap thumbnail(const reflexive_entity& e, sz::thumbnail_target_size size) const;
         QPixmap thumbnail(const reflexive_entity& e) const;
+        QPixmap thumbnail(const QModelIndex& index) const;
         bool has_thumbnail(const QModelIndex& index) const;
-        bool thumbnail_loaded(const QModelIndex& index) const;
+        bool has_thumbnail_loaded(const QModelIndex& index, sz::thumbnail_target_size size) const;
+        bool has_thumbnail_loaded(const QModelIndex& index) const;
         QModelIndex root_index() const;
         QModelIndex index(const QString& query_text);
         QString root_query() const;
@@ -130,13 +134,13 @@ namespace rin
         void query_failed(QString query_string, QList<std::tuple<QString, QString>> failed);
         void query_done(const QModelIndex& parent);
         void query_done(const QString& query_string);
-        void need_thumbnails(const std::vector<std::tuple<QString, QModelIndex, QSize>>& data);
         void sort_starting();
         void sort_finished();
         void fetch_failed(const QString& target_path, const std::vector<entity_model_url>& urls, fetch_action action);
+        void thumbnail_available(const reflexive_entity& e, sz::thumbnail_target_size size);
         
         public slots:
-        void set_thumbnail_target_size(const QSize& size);
+        void set_thumbnail_target_size(sz::thumbnail_target_size size);
         void set_sort_preference(int column, Qt::SortOrder order);
 
         protected:
@@ -153,7 +157,7 @@ namespace rin
         void update(const query_descriptor& qd, std::vector<reflexive_entity> data);
         void update(const entity_tree_node& updated_node, int start, int end);
         void copy(const entity_tree_node& updated_node, const std::vector<node_index_change>& updated_key_indexes = {});
-        void set_thumbnails(const std::vector<std::tuple<QString, QModelIndex, QPixmap>>& data);
+        void set_thumbnail(const thumbnail_descriptor& data);
         void finalize_query(query_descriptor qd);
         void handle_query_progress(query_descriptor qd, QList<std::tuple<QString, int>> processed);
         void handle_query_failure(query_descriptor qd, QList<std::tuple<QString, QString>> failed);
@@ -209,7 +213,10 @@ namespace rin
         inline QModelIndex m_reset_root_query(const QString& text);
         inline bool m_valid_index(const QModelIndex& index) const;
         inline bool m_is_concept(const QModelIndex& index) const;
-        inline const QPixmap& m_thumbnail_for_index(const QModelIndex& index) const;
+        inline bool m_has_thumbnail_loaded(const QString& name, const int node_key, sz::thumbnail_target_size size) const;
+        inline bool m_has_thumbnail_loaded(const QString& name, const int node_key) const;
+        inline const QPixmap& m_thumbnail_for_entity(const QString& name, const int node_key, sz::thumbnail_target_size size) const;
+        inline const QPixmap& m_thumbnail_for_entity(const QString& name, const int node_key) const;
         inline void m_async_sort(int key, int column, Qt::SortOrder order);
         inline void m_async_sort(int key, entity_attribute_type sort_key, Qt::SortOrder sort_order);
         inline void m_sort(int key, int column, Qt::SortOrder order);
@@ -217,12 +224,20 @@ namespace rin
         private:
         using enum entity_attribute_type;
         std::unique_ptr<entity_data_manager> m_dataman;
+        std::unique_ptr<thumbnail_manager> m_thumbman;
         std::filesystem::path m_database_path;
-        QThread m_thumbman;
         entity_tree m_tree;
         QHash<QMimeType, QIcon> m_icon_cache;
         QFileIconProvider m_icon_provider;
-        std::unordered_map<int, std::unordered_map<QString, QPixmap>> m_thumbnails; // TODO: the thumbnail manager should hold this for us
+        
+        std::unordered_map<
+            int, std::unordered_map<
+                QString, std::unordered_map<
+                    sz::thumbnail_target_size, QPixmap
+                >
+            >
+        > m_thumbnails;
+        
         std::unordered_map<QString, std::unordered_map<QString, item_temp_data>> m_items_pending_update;
         std::unordered_map<QString, index_descriptor> m_in_progress_db_writes;
         std::unordered_map<entity_attribute_type, QString> m_attribute_names; // key to string representation of key (user-modifiable)
@@ -236,7 +251,7 @@ namespace rin
         std::optional<int> m_root;
         std::optional<int> m_sort_column;
         std::optional<Qt::SortOrder> m_sort_order;
-        QSize m_thumbnail_target_size;
+        sz::thumbnail_target_size m_thumbnail_target_size;
         int m_batchsize;
         bool m_readonly;
     };

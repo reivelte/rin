@@ -56,7 +56,7 @@ namespace rin
         
         // view control
         void set_view_iconsize(int size);
-        void update_iconsizer(const QSize& size);
+        void update_icon_size(const QSize& size);
         void handle_view_rightclick(const QModelIndex& index);
         // ###################################################### specific to a window tab ######
 

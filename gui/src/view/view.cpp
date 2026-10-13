@@ -293,8 +293,6 @@ namespace rin
         {
             auto* entitymodel = m->entity_model_ptr();
             m->entitymodel_conns = {
-                connect(this, &entity_view::iconSizeChanged, entitymodel, &entity_model::set_thumbnail_target_size),
-
                 // there is a seriously sinister hidden bug/undefined behavior that corrupts the bsp
                 // whenever entity_view's column_resized slot is executed as a result of entity_model sorting itself after a finalized query.
                 // list_mode's QHeaderView is signaled to do a variety of things when the model emits layoutChanged, one of which is

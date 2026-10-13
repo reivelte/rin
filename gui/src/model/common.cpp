@@ -5,9 +5,32 @@
 #include <suzuri/utility/string.hpp>
 #include "common.hpp"
 #include "tree.hpp"
+#include "entity.hpp"
 
 namespace rin
 {
+    void query_descriptor::adjust(const reflexive_entity& e, bool increment)
+    {
+        using enum entity_attribute_type;
+        using enum sz::entity_type;
+        const int adj = increment ? 1 : -1;
+        if (e.type() == File)
+        {
+            if (const auto& fsinfo = e.attribute<QFileInfo>(File_Info); fsinfo.isDir())
+            { dir_count += adj; }
+            else
+            {
+                file_count += adj;
+                if (increment)
+                { filesize += static_cast<uintmax_t>(fsinfo.size()); }
+                else
+                { filesize -= static_cast<uintmax_t>(fsinfo.size()); }
+            }
+        }
+        else if (e.type() == Tag || e.type() == Alias)
+        { tag_count += adj; }
+    }
+
     void sort_entities(entity_tree_node& node)
     {
         using enum entity_attribute_type;

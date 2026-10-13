@@ -47,38 +47,38 @@ namespace sz
 
     entity_database_info entity_database::entity_info(const std::string& id)
     {
-        if (!entity_exists(id))
-        { throw exception(result_code::Invalid_Argument, std::format("'{}' does not refer to an entity in the database", id)); }
-        
-        // type,create_time,mod_time,rgba,id,description
-        auto [t, create, mod, rgba, eid, description] = m_entity_info(id);
-        auto type = entity_type{t};
-        std::vector<sqlite::variant> extra_info;
-
-        using enum entity_type;
-        switch (type)
+        entity_database_info info;
+        if (entity_exists(id))
         {
-        case File:
-            extra_info = m_file_info(eid);
-            break;
-        
-        case Alias:
-            extra_info.emplace_back(alias_target(eid));
-            break;
+            // type,create_time,mod_time,rgba,id,description
+            auto [t, create, mod, rgba, eid, description] = m_entity_info(id);
+            auto type = entity_type{t};
+            std::vector<sqlite::variant> extra_info;
 
-        default:
-            break;
+            using enum entity_type;
+            switch (type)
+            {
+            case File:
+                extra_info = m_file_info(eid);
+                break;
+            
+            case Alias:
+                extra_info.emplace_back(alias_target(eid));
+                break;
+
+            default:
+                break;
+            }
+
+            info.extra_info = extra_info;
+            info.id = eid;
+            info.description = description;
+            info.createtime = create;
+            info.modtime = mod;
+            info.rgba = rgba;
+            info.type = type;
         }
-
-        return entity_database_info{
-            .extra_info = extra_info,
-            .id = eid,
-            .description = description,
-            .createtime = create,
-            .modtime = mod,
-            .rgba = rgba,
-            .type = type
-        };
+        return info;
     }
 
     // TODO*: create a manual transaction instead of invoking exec for each statement, otherwise rollback wont do what we want

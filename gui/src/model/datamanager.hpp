@@ -21,7 +21,6 @@
 #include <QtWidgets/QFileIconProvider>
 #include <QtGui/QImageReader>
 #include <suzuri/entity/database.hpp>
-#include "thumbnailmanager.hpp"
 #include "tree.hpp"
 
 namespace rin

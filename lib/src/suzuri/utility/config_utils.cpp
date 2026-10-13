@@ -34,20 +34,22 @@ namespace sz
         switch (type)
         {
             case Config: { p = std::getenv("$XDG_CONFIG_HOME"); break; }
-            case State: { p = std::getenv("$XDG_STATE_HOME"); break; }
-            case Data: { p = std::getenv("$XDG_DATA_HOME"); break; }
+            case State:  { p = std::getenv("$XDG_STATE_HOME"); break; }
+            case Data:   { p = std::getenv("$XDG_DATA_HOME"); break; }
+            case Cache:  { p = std::getenv("$XDG_CACHE_HOME"); break; }
             default: break;
         }
 
         if (p)
         { return p; }
 
-        const std::string home = std::getenv("HOME");
+        const std::string home = get_home_directory().string();
         switch (type)
         {
             case Config: { return home + "/.config"; }
-            case State: { return home + "/.local/state"; }
-            case Data: { return home + "/.local/share"; }
+            case State:  { return home + "/.local/state"; }
+            case Data:   { return home + "/.local/share"; }
+            case Cache:  { return home + "/.cache"; }
             default: break;
         }
         return {};
@@ -73,7 +75,7 @@ namespace sz
         return config;
     }
 
-    toml_config::toml_config(const std::filesystem::path &p, config_type t) : m_filepath(p), m_type(t)
+    toml_config::toml_config(const std::filesystem::path& p, config_type t) : m_filepath(p), m_type(t)
     {
         m_init();
     }
