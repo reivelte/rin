@@ -108,6 +108,7 @@ namespace rin
         m_dataman->set_database(path);
         clear_thumbnails();
         m_thumbman->set_database(path);
+        m_database_path = path;
     }
 
     void entity_model::set_display_attributes(const std::vector<entity_attribute_type>& attrs)
