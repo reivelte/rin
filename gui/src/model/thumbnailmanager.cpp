@@ -91,18 +91,21 @@ namespace rin
 
             // do work
             const int key = std::as_const(m_queue.front());
-            
+            job_batch batch = std::as_const(m_batches).at(key);
+
             m_working = true;
             m_mutex.unlock();
             setTerminationEnabled(true);
             
-            const bool batch_done = m_exec_batch(m_batches[key]);
+            const bool batch_done = m_exec_batch(batch);
             
             setTerminationEnabled(false);
             m_mutex.lock();
             
             if (batch_done)
             { m_remove(key); }
+            else
+            { m_batches[key] = batch; }
 
             m_working = false;
             m_no_work_being_performed.notify_all();
