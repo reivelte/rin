@@ -14,7 +14,6 @@
 #include <QtWidgets/QComboBox>
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QVBoxLayout>
-#include <suzuri/utility/config_utils.hpp>
 
 namespace rin
 {
@@ -26,7 +25,7 @@ namespace rin
         Q_OBJECT
 
         public:
-        domain_dialog(QWidget* parent, domain_dialog_type type, const std::shared_ptr<sz::toml_config>& state_conf);
+        domain_dialog(QWidget* parent, domain_dialog_type type);
         ~domain_dialog();
 
         signals:
@@ -49,7 +48,6 @@ namespace rin
         // open dialog
 
         // common
-        std::shared_ptr<sz::toml_config> m_state_config;
         domain_dialog_type m_type;
     };
     

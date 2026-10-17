@@ -7,12 +7,13 @@
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QFileDialog>
 #include <QtGui/QRegularExpressionValidator>
+#include <suzuri/core/ctl.hpp>
 #include "domain.hpp"
 
 namespace rin
 {
-    domain_dialog::domain_dialog(QWidget* parent, domain_dialog_type type, const std::shared_ptr<sz::toml_config>& state_conf) :
-        QDialog(parent), m_state_config(state_conf), m_type(type)
+    domain_dialog::domain_dialog(QWidget* parent, domain_dialog_type type) :
+        QDialog(parent), m_type(type)
     {
         setModal(true);
         setSizeGripEnabled(true);
@@ -60,10 +61,10 @@ namespace rin
             m_location_chooser->setCurrentText(QString::fromStdString(default_loc.string()));
         }
 
-        const std::vector<std::filesystem::path> locations = m_state_config->domain_locations();
+        const auto locations = SZ_STATE_CONF->value<std::vector<std::string>>("domain.locations");
         for (const auto& x : locations)
         {
-            m_location_chooser->addItem(QString::fromStdString(x.string()));
+            m_location_chooser->addItem(QString::fromStdString(x));
         }
 
         m_dialog_layout = new QVBoxLayout(this);
@@ -91,8 +92,14 @@ namespace rin
             m_location_chooser->addItem(location);
             m_location_chooser->setCurrentText(location);
 
-            if (m_state_config && m_state_config->available())
-            { m_state_config->add_domain_location(location.toStdString()); }
+            auto* state = SZ_STATE_CONF;
+            if (state->available())
+            {
+                // FIXME: check that we are not duplicating strings
+                auto locations = state->value<std::vector<std::string>>("domain.locations");
+                locations.push_back(location.toStdString());
+                state->set_value("domain.locations", locations);
+            }
         }
     }
 

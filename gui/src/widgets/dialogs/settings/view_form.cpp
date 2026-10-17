@@ -2,12 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include <suzuri/core/ctl.hpp>
 #include "view_form.hpp"
 
 namespace rin
 {
-    view_settings_form::view_settings_form(const std::shared_ptr<sz::toml_config>& config, settings_dialog* parent) :
-        settings_form(parent), m_config(config)
+    view_settings_form::view_settings_form(settings_dialog* parent) :
+        settings_form(parent)
     {
         m_form_layout = new QFormLayout(this);
         m_visual_align_chooser = new QComboBox(this);
@@ -28,7 +29,7 @@ namespace rin
     void view_settings_form::commit()
     {
         const auto value = m_visual_align_chooser->currentText().toLower().toStdString();
-        m_config->set_value("view.item_row_alignment", value);
+        SZ_MAIN_CONF->set_value("view.item_row_alignment", value);
     }
 
 } // namespace rin

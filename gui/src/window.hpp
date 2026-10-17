@@ -8,7 +8,6 @@
 #include <QtWidgets/QMainWindow>
 #include <QtGui/QIcon>
 #include <QtGui/QKeySequence>
-#include <suzuri/utility/config_utils.hpp>
 #include "tagger/tagger.hpp"
 #include "widgets/dialogs/settings/dialog.hpp"
 #include "widgets/details_panel.hpp"
@@ -111,8 +110,6 @@ namespace rin
 
         private:
         // application-wide
-        std::shared_ptr<sz::toml_config> m_state_config;
-        std::shared_ptr<sz::toml_config> m_main_config;
         std::filesystem::path m_database_path;
         
         QSplitter* m_nav_splitter;

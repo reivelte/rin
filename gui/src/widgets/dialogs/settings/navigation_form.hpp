@@ -19,7 +19,7 @@ namespace rin
         Q_OBJECT
         
         public:
-        navigation_panel_settings_form(const std::shared_ptr<sz::toml_config>& config, settings_dialog* parent);
+        navigation_panel_settings_form(settings_dialog* parent);
         ~navigation_panel_settings_form() = default;
 
         QList<QFileInfo> targets();
@@ -38,7 +38,6 @@ namespace rin
         void commit() override;
 
         private:
-        std::shared_ptr<sz::toml_config> m_config;
         QFormLayout* m_form_layout;
         QListWidget* m_items;
         

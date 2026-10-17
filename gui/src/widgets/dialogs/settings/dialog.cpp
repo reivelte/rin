@@ -9,15 +9,15 @@
 
 namespace rin
 {
-    settings_dialog::settings_dialog(const std::shared_ptr<sz::toml_config>& config, QWidget* parent)
-    : QDialog(parent), m_config(config)
+    settings_dialog::settings_dialog(QWidget* parent)
+    : QDialog(parent)
     {
         m_menulist = new QListWidget(this);
         m_pages = new QStackedWidget(this);
         
-        m_add_form(tr("General"), new general_settings_form(config, this));
-        m_add_form(tr("Navigation"), new navigation_panel_settings_form(config, this));
-        m_add_form(tr("View"), new view_settings_form(config, this));
+        m_add_form(tr("General"), new general_settings_form(this));
+        m_add_form(tr("Navigation"), new navigation_panel_settings_form(this));
+        m_add_form(tr("View"), new view_settings_form(this));
 
         m_current_page = "General";
 

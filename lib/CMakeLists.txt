@@ -73,6 +73,7 @@ set(public_headers #!BEGIN: HEADER LIST
   src/${PROJECT_NAME}/entity/entity.hpp
   src/${PROJECT_NAME}/entity/common.hpp
   src/${PROJECT_NAME}/entity/registry.hpp
+  src/${PROJECT_NAME}/core/ctl.hpp
   src/${PROJECT_NAME}/sqlite/common.hpp
   src/${PROJECT_NAME}/sqlite/query.hpp
   src/${PROJECT_NAME}/sqlite/database.hpp
@@ -83,6 +84,7 @@ set(public_headers #!BEGIN: HEADER LIST
   src/${PROJECT_NAME}/utility/thumbnail.hpp
   src/${PROJECT_NAME}/utility/config_utils.hpp
   src/${PROJECT_NAME}/utility/json.hpp
+  src/${PROJECT_NAME}/thread/guarded_ptr.hpp
   src/${PROJECT_NAME}/metadata/tags.hpp
 ) #!END: HEADER LIST
 
@@ -91,6 +93,7 @@ set(sources #!BEGIN: SOURCE LIST
   src/${PROJECT_NAME}/entity/database.cpp
   src/${PROJECT_NAME}/entity/common.cpp
   src/${PROJECT_NAME}/entity/registry.cpp
+  src/${PROJECT_NAME}/core/ctl.cpp
   src/${PROJECT_NAME}/sqlite/database.cpp
   src/${PROJECT_NAME}/sqlite/query.cpp
   src/${PROJECT_NAME}/utility/string.cpp

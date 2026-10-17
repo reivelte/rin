@@ -21,6 +21,7 @@
 #include <QtGui/QImageReader>
 #include <QtGui/QFileSystemModel>
 #include <QtGui/QContextMenuEvent>
+#include <suzuri/core/ctl.hpp>
 #include <suzuri/utility/thumbnail.hpp>
 #include "window.hpp"
 #include "view/view.hpp"
@@ -42,71 +43,33 @@ namespace rin
         m_navpanel = nullptr;
         m_details_panel = nullptr;
         m_tagger = nullptr;
-        
-        const auto local_state_dir = std::filesystem::path(sz::get_xdg_directory(sz::data_directory_type::State)) / "rin";
-        bool state_config_dir_available = true;
-        if (!std::filesystem::exists(local_state_dir))
-        {
-            const bool success = std::filesystem::create_directories(local_state_dir);
-            if (!success)
-            {
-                qWarning() << "main_window: unable to access state directory for rin. no state settings will be loaded.";
-                state_config_dir_available = false;
-            }
-        }
-
-        if (state_config_dir_available) // should we assume it is writeable?
-        {
-            std::filesystem::path state_config_path = local_state_dir / "state.toml";
-            
-            qDebug() << "main_window: setting state config to: " << state_config_path;
-            m_state_config = std::make_shared<sz::toml_config>(state_config_path, sz::config_type::State);
-            
-            if (auto [w, h] = m_state_config->window_size(); w > 0 && h > 0)
-            { resize(w, h); }
-            else
-            { resize(800, 600); }
-        }
-
-        const auto local_config_dir = std::filesystem::path(sz::get_xdg_directory(sz::data_directory_type::Config)) / "rin";
-        if (!std::filesystem::exists(local_config_dir))
-        {
-            // TODO: try alternatives before resorting to creating a new directory
-            const bool ok = std::filesystem::create_directories(local_config_dir);
-            if (!ok)
-            {
-                qWarning() << "[main_window] unable to create config directory: " << local_config_dir;
-                
-            }
-        }
-
-        if (std::filesystem::exists(local_config_dir))
-        {
-            const auto config_path = local_config_dir / "gui.toml";
-            m_main_config = std::make_shared<sz::toml_config>(config_path, sz::config_type::Static);
-        }
 
         m_model = new entity_model(this, ":memory:"); // is this a good default for the database?
         m_model->set_batchsize(100000); // TODO: make configurable
         m_model->set_readonly(false);
 
-        if (m_state_config)
+        sz::toml_config* main_conf = SZ_MAIN_CONF;
+        sz::toml_config* state_conf = SZ_STATE_CONF;
+
+        if (state_conf->available())
         {
-            if (const auto db_path = m_state_config->domain_recently_used(); sz::is_valid_domain(db_path))
-            { m_set_database(db_path); }
+            if (state_conf->has_value("domain.recently_used"))
+            { m_set_database(state_conf->value<std::string>("domain.recently_used")); }
             else
             { m_set_database(":memory:"); }
-        }
-        else
-        { m_set_database(":memory:"); }
 
-        qDebug() << "main_window: using domain database: " << m_database_path;
+            if (state_conf->has_value("window.size"))
+            {
+                auto [w, h] = state_conf->value<int, int>("window.size");
+                resize(w, h);
+            }
+        }
 
         auto viewmode = entity_view_mode::List;
         
-        if (m_main_config && m_main_config->has_value("view.default_viewmode"))
+        if (main_conf->has_value("view.default_viewmode"))
         {
-            if (const auto m = m_main_config->value<std::string>("view.default_viewmode"); m == "list")
+            if (const auto m = main_conf->value<std::string>("view.default_viewmode"); m == "list")
             { viewmode = entity_view_mode::List; }
             else if (m == "icon")
             { viewmode = entity_view_mode::Icon; }
@@ -125,7 +88,7 @@ namespace rin
 
         // ------- begin navigation toolbar setup
         m_navpanel = new navigation_panel(this);
-        if (auto targets = m_main_config->value<std::vector<std::string>>("navigation_panel.targets"); targets.size())
+        if (auto targets = main_conf->value<std::vector<std::string>>("navigation_panel.targets"); targets.size())
         {
             for (const auto& path : targets)
             {
@@ -176,9 +139,9 @@ namespace rin
         m_status_bar->addPermanentWidget(m_listmode_toggle);
         m_status_bar->addPermanentWidget(m_icon_sizer);
 
-        if (m_main_config && m_main_config->has_value("view.item_row_alignment"))
+        if (main_conf->has_value("view.item_row_alignment"))
         {
-            m_set_view_item_alignment(m_main_config->value<std::string>("view.item_row_alignment"));
+            m_set_view_item_alignment(main_conf->value<std::string>("view.item_row_alignment"));
         }
         m_view->set_item_layout_mode(entity_view_item_layout_mode::Row_Column);
         setCentralWidget(m_view);
@@ -224,7 +187,7 @@ namespace rin
         m_model->set_sort_preference(0, Qt::SortOrder::DescendingOrder);
 
         QString path;
-        if (auto start_folder = m_main_config->value<std::string>("general.start_folder"); start_folder.size())
+        if (auto start_folder = main_conf->value<std::string>("general.start_folder"); start_folder.size())
         { path = QString::fromStdString(start_folder); }
         else
         { path = QString::fromStdString(sz::get_home_directory().string()); }
@@ -234,10 +197,10 @@ namespace rin
 
     main_window::~main_window()
     {
-        if (m_state_config && m_state_config->available())
+        if (sz::toml_config* state_conf = SZ_STATE_CONF; state_conf->available())
         {
-            QSize s = size();
-            m_state_config->set_window_size(s.width(), s.height());
+            const auto [w, h] = size();
+            state_conf->set_value("window.size", w, h);
         }
     }
 
@@ -400,7 +363,7 @@ namespace rin
     void main_window::reset_navigation_panel()
     {
         m_navpanel->clear();
-        if (auto paths = m_main_config->value<std::vector<std::string>>("navigation_panel.targets"); paths.size())
+        if (auto paths = SZ_MAIN_CONF->value<std::vector<std::string>>("navigation_panel.targets"); paths.size())
         { m_navpanel->add_targets(paths); }
     }
 
@@ -426,7 +389,7 @@ namespace rin
         {
             m_domain_dialog->deleteLater();
         }
-        m_domain_dialog = new domain_dialog(this, domain_dialog_type::New, m_state_config);
+        m_domain_dialog = new domain_dialog(this, domain_dialog_type::New);
         connect(m_domain_dialog, &domain_dialog::domain_created, this, &main_window::create_domain);
         m_domain_dialog->show();
     }
@@ -459,13 +422,13 @@ namespace rin
         if (m_settings_dialog)
         { delete m_settings_dialog; }
 
-        m_settings_dialog = new settings_dialog(m_main_config, this);
+        m_settings_dialog = new settings_dialog(this);
 
         connect(m_settings_dialog, &settings_dialog::settings_applied, this, [&]() -> void
         {
             if (const QString name = m_settings_dialog->current_page_name(); name == "View")
             {
-                m_set_view_item_alignment(m_main_config->value<std::string>("view.item_row_alignment"));
+                m_set_view_item_alignment(SZ_MAIN_CONF->value<std::string>("view.item_row_alignment"));
             }
             else if (name == "Navigation")
             {
@@ -564,8 +527,10 @@ namespace rin
         m_database_path = path;
         m_model->set_database(path);
 
-        if (m_state_config && m_state_config->available())
-        { m_state_config->set_recently_used_domain(path); }
+        if (auto* state_conf = SZ_STATE_CONF; state_conf->available())
+        {
+            state_conf->set_value("domain.recently_used", path.string());
+        }
         
         m_set_window_title();
     }

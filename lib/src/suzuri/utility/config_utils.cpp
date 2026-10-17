@@ -23,7 +23,7 @@ namespace sz
         return p;
     }
 
-    SZ_API std::string get_xdg_directory(data_directory_type type)
+    SZ_API std::filesystem::path get_xdg_directory(data_directory_type type)
     {
         using enum data_directory_type;
 #ifdef _WIN32
@@ -56,8 +56,20 @@ namespace sz
 #endif
     }
 
+    std::filesystem::path get_config_path(config_type type)
+    {
+        using enum config_type;
+        switch (type)
+        {
+        default:
+        case Static: { return get_xdg_directory(data_directory_type::Config) / "rin" / "config.toml"; }
+        case State: { return get_xdg_directory(data_directory_type::State) / "rin" / "state.toml"; }
+        }
+        return {};
+    }
+
     // TODO: verify some metadata with the database/config files themselves
-    SZ_API bool is_valid_domain(const std::filesystem::path& path)
+    bool is_valid_domain(const std::filesystem::path& path)
     {
         auto name = path.stem();
         auto pname = path.parent_path().stem();
@@ -80,18 +92,7 @@ namespace sz
         m_init();
     }
 
-    bool toml_config::has_value(std::string key)
-    {
-        auto data = m_read();
-        if (data)
-        {
-            auto keys = sz::utility::split(".", key);
-            return m_keys_exist(keys, *data);
-        }
-        return false;
-    }
-
-    sz::result<void> toml_config::set_config(const std::filesystem::path &p, config_type t)
+    sz::result<void> toml_config::set_config(const std::filesystem::path& p, config_type t)
     {
         m_filepath = p;
         m_type = t;
@@ -103,101 +104,26 @@ namespace sz
         return {};
     }
 
-    void toml_config::set_window_size(int w, int h)
+    bool toml_config::has_value(std::string key) const
     {
-        auto data = toml::parse<toml::ordered_type_config>(m_filepath);
+        auto data = m_read();
+        if (data)
+        {
+            auto keys = sz::utility::split(".", key);
+            return m_keys_exist(keys, *data);
+        }
+        return false;
+    }
+
+    bool toml_config::available() const
+    {
+        if (!std::filesystem::exists(m_filepath))
+        { return false; }
         
-        if (!(data.contains("window") && data.at("window").contains("size")))
-        {
-            data["window"]["size"] = toml::array{};
-        }
+        if (auto data = m_read(); !data)
+        { return false; }
 
-        auto& s = data.at("window").at("size").as_array();
-        s.clear();
-        s.push_back(w);
-        s.push_back(h);
-        
-        m_write(data);
-    }
-
-    void toml_config::set_recently_used_domain(const std::filesystem::path& path)
-    {
-        auto data = toml::parse<toml::ordered_type_config>(m_filepath);
-        data["domain"]["recently_used"] = path.string();
-        m_write(data);
-    }
-
-    void toml_config::add_domain_location(const std::filesystem::path& path)
-    {
-        auto data = toml::parse<toml::ordered_type_config>(m_filepath);
-
-        if (!(data.contains("domain") && data.at("domain").contains("locations")))
-        {
-            data["domain"]["locations"] = toml::array{};
-        }
-        auto& v = data.at("domain").at("locations");
-        v.push_back(path.string());
-
-        m_write(data);
-    }
-
-    vector2 toml_config::window_size() const
-    {
-        auto data = toml::parse(m_filepath);
-        if (data.contains("window") && data.at("window").contains("size"))
-        {
-            auto [width, height] = toml::find<std::tuple<int, int>>(data, "window", "size");
-            return vector2{
-                .x = width,
-                .y = height
-            };
-        }
-        return {};
-    }
-
-    std::filesystem::path toml_config::domain_recently_used() const
-    {
-        std::filesystem::path path = "";
-        auto data = toml::parse(m_filepath);
-        if (data.contains("domain") && data.at("domain").contains("recently_used"))
-        {
-            path = toml::find<std::string>(data, "domain", "recently_used");
-        }
-        return path;
-    }
-
-    std::vector<std::filesystem::path> toml_config::domain_locations() const
-    {
-        std::vector<std::filesystem::path> ret;
-        auto data = toml::parse(m_filepath);
-        if (data.contains("domain") && data.at("domain").contains("locations"))
-        {
-            auto v = toml::find<std::vector<std::string>>(data, "domain", "locations");
-            for (auto& x : v)
-            {
-                ret.emplace_back(x);
-            }
-        }
-        return ret;
-    }
-
-    bool toml_config::m_keys_exist(const std::vector<std::string>& keys, toml::ordered_value& data)
-    {
-        if (keys.size() == 1)
-        {
-            return data.contains(keys[0]);
-        }
-        return data.contains(keys[0]) && data.at(keys[0]).contains(keys[1]);
-    }
-
-    toml::ordered_value &toml_config::m_data_for_keys(const std::vector<std::string> &keys, toml::ordered_value &data)
-    {
-        if (keys.size() == 1)
-        {
-            return data.at(keys[0]);
-        }
-        
-        return data.at(keys[0]).at(keys[1]);
+        return true;
     }
 
     sz::result<toml::ordered_value> toml_config::m_init()
@@ -212,6 +138,25 @@ namespace sz
             << std::endl;
         }
         return m_read();
+    }
+
+    toml::ordered_value& toml_config::m_data_for_keys(const std::vector<std::string>& keys, toml::ordered_value& data) const
+    {
+        if (keys.size() == 1)
+        {
+            return data.at(keys[0]);
+        }
+        
+        return data.at(keys[0]).at(keys[1]);
+    }
+
+    bool toml_config::m_keys_exist(const std::vector<std::string>& keys, toml::ordered_value& data) const
+    {
+        if (keys.size() == 1)
+        {
+            return data.contains(keys[0]);
+        }
+        return data.contains(keys[0]) && data.at(keys[0]).contains(keys[1]);
     }
 
     sz::result<toml::ordered_value> toml_config::m_read() const

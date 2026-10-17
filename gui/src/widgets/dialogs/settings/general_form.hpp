@@ -15,7 +15,7 @@ namespace rin
         Q_OBJECT
 
         public:
-        general_settings_form(const std::shared_ptr<sz::toml_config>& config, settings_dialog* parent);
+        general_settings_form(settings_dialog* parent);
         ~general_settings_form();
 
         bool can_apply_settings() const override;
@@ -24,7 +24,6 @@ namespace rin
         void commit() override;
 
         private:
-        std::shared_ptr<sz::toml_config> m_config;
         QFormLayout* m_form_layout;
         QLineEdit* m_startfolder_lineedit;
     };

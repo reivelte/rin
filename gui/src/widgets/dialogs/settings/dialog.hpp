@@ -15,7 +15,6 @@
 #include <QtWidgets/QDialogButtonBox>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QFileDialog>
-#include <suzuri/utility/config_utils.hpp>
 
 namespace rin
 {
@@ -25,7 +24,7 @@ namespace rin
         Q_OBJECT
         
         public:
-        settings_dialog(const std::shared_ptr<sz::toml_config>& config, QWidget* parent);
+        settings_dialog(QWidget* parent);
         ~settings_dialog();
 
         settings_form* page(const QString& name) const;
@@ -47,7 +46,6 @@ namespace rin
         void m_add_form(const QString& name, settings_form* form);
 
         private:
-        std::shared_ptr<sz::toml_config> m_config;
         std::unordered_map<QString, settings_form*> m_forms;
         QString m_current_page;
         QListWidget* m_menulist;

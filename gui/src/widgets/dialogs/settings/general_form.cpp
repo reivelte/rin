@@ -3,19 +3,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include <QtCore/QFileInfo>
+#include <suzuri/core/ctl.hpp>
 #include "general_form.hpp"
 
 namespace rin
 {
-    general_settings_form::general_settings_form(const std::shared_ptr<sz::toml_config>& config, settings_dialog* parent) :
-        settings_form(parent), m_config(config)
+    general_settings_form::general_settings_form(settings_dialog* parent) :
+        settings_form(parent)
     {
         m_form_layout = new QFormLayout(this);
         m_startfolder_lineedit = new QLineEdit;
 
         m_form_layout->addRow(tr("&Start Folder:"), m_startfolder_lineedit);
 
-        if (auto start_folder = m_config->value<std::string>("general.start_folder"); start_folder.size())
+        if (auto start_folder = SZ_MAIN_CONF->value<std::string>("general.start_folder"); start_folder.size())
         {
             m_startfolder_lineedit->setText(QString::fromStdString(start_folder));
         }
@@ -36,7 +37,7 @@ namespace rin
         
         if (QFileInfo info(path); info.isDir())
         {
-            m_config->set_value("general.start_folder", path.toStdString());
+            SZ_MAIN_CONF->set_value("general.start_folder", path.toStdString());
         }
     }
 } // namespace rin

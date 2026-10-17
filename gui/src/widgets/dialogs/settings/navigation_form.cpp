@@ -4,12 +4,13 @@
 
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QFileDialog>
+#include <suzuri/core/ctl.hpp>
 #include "navigation_form.hpp"
 
 namespace rin
 {
-    navigation_panel_settings_form::navigation_panel_settings_form(const std::shared_ptr<sz::toml_config>& config, settings_dialog* parent) :
-        settings_form(parent), m_config(config)
+    navigation_panel_settings_form::navigation_panel_settings_form(settings_dialog* parent) :
+        settings_form(parent)
     {
         m_form_layout = new QFormLayout(this);
         m_items = new QListWidget(this);
@@ -25,7 +26,7 @@ namespace rin
         m_form_layout->addRow(tr("&Directories:"), m_items);
         m_form_layout->addRow(tr("Add Directory:"), m_path_input_layout);
 
-        auto t = m_config->value<std::vector<std::string>>("navigation_panel.targets");
+        auto t = SZ_MAIN_CONF->value<std::vector<std::string>>("navigation_panel.targets");
         if (t.size())
         {
             for (const std::string& path : t)
@@ -84,7 +85,7 @@ namespace rin
         {
             paths.emplace_back(info.absoluteFilePath().toStdString());
         }
-        m_config->set_value("navigation_panel.targets", paths);
+        SZ_MAIN_CONF->set_value("navigation_panel.targets", paths);
         emit new_navigation_panel_targets_applied();
     }
 
