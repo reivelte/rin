@@ -702,6 +702,9 @@ namespace rin
         node.largest_item_index = lii;
     }
 
+    // this might be called as a result of a call to recalculate_content_width() inside expand_node()
+    // any node encountered inside traverse_tree() may not be completely setup yet
+    // if it is not possible to return a node because of this, an invalid index should be returned
     QModelIndex entity_view::list_mode::widest_node() const
     {
         QModelIndex index;
@@ -709,12 +712,16 @@ namespace rin
         traverse_tree([&](const QModelIndex& parent) -> bool
         {
             const int lii = nodes[parent].largest_item_index;
-            if (const int nw = nodes[parent].items[lii].index_hint(); nw > w)
+            if (lii > -1)
             {
-                w = nw;
-                index = parent;
+                if (const int nw = nodes[parent].items[lii].index_hint(); nw > w)
+                {
+                    w = nw;
+                    index = parent;
+                }
+                return false;
             }
-            return false;
+            return true;
         });
         return index;
     }
