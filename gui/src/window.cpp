@@ -76,7 +76,7 @@ namespace rin
         }
         
         m_view = new entity_view(this);
-        m_view->set_viewmode(viewmode);
+        m_set_viewmode(viewmode);
         m_view->setModel(m_model);
         
         m_lineedit = new QLineEdit;
@@ -139,11 +139,6 @@ namespace rin
         m_status_bar->addPermanentWidget(m_listmode_toggle);
         m_status_bar->addPermanentWidget(m_icon_sizer);
 
-        if (main_conf->has_value("view.item_row_alignment"))
-        {
-            m_set_view_item_alignment(main_conf->value<std::string>("view.item_row_alignment"));
-        }
-        m_view->set_item_layout_mode(entity_view_item_layout_mode::Row_Column);
         setCentralWidget(m_view);
 
         connect(m_lineedit, &QLineEdit::returnPressed, this, &main_window::read_input);
@@ -167,7 +162,7 @@ namespace rin
         {
             if (clicked)
             {
-                m_view->set_viewmode(entity_view_mode::Icon);
+                m_set_viewmode(entity_view_mode::Icon);
                 update_status_view_counts(QModelIndex());
             }
         });
@@ -175,7 +170,7 @@ namespace rin
         {
             if (clicked)
             {
-                m_view->set_viewmode(entity_view_mode::List);
+                m_set_viewmode(entity_view_mode::List);
                 update_status_view_counts(QModelIndex());
             }
         });
@@ -553,6 +548,20 @@ namespace rin
         { align = Bottom; }
 
         m_view->set_item_alignment(align);
+    }
+
+    void main_window::m_set_viewmode(entity_view_mode mode)
+    {
+        using enum entity_view_mode;
+        
+        m_view->set_viewmode(mode);
+        if (mode == Icon)
+        {
+            if (auto* conf = SZ_MAIN_CONF; conf->has_value("view.item_row_alignment"))
+            { m_set_view_item_alignment(conf->value<std::string>("view.item_row_alignment")); }
+
+            m_view->set_item_layout_mode(entity_view_item_layout_mode::Row_Column);
+        }
     }
 
     QString main_window::m_make_view_stats_status_message(uintmax_t size, size_t dir_count, size_t file_count, size_t tag_count)
