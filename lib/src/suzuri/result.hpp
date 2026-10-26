@@ -12,6 +12,7 @@
 #include <format>
 #include <print>
 #include <filesystem>
+#include <magic_enum/magic_enum.hpp>
 #include "types.hpp"
 
 namespace sz
@@ -54,7 +55,7 @@ namespace sz
                 { return static_cast<int>(code); }
             }()),
 
-        m_error_type(type_name<T>()), m_location(loc), m_msg(std::string(msg)) {}
+        m_error_type(std::string(type_name<T>()) + "::" + std::string(magic_enum::enum_name(code))), m_location(loc), m_msg(std::string(msg)) {}
 
         explicit common_error(std::error_code&& err_code, std::source_location loc = std::source_location::current())
         : m_error_code(err_code.value()), 
@@ -80,7 +81,7 @@ namespace sz
             auto path = std::filesystem::path(m_location.file_name()).filename().string();
             auto line = m_location.line();
             auto col = m_location.column();
-            return std::format("{}({}) in {}({},{})", errtype, errcode, path, line, col);
+            return std::format("{} ({}) in {}({},{})", errtype, errcode, path, line, col);
         }
         
         inline std::string_view original_type() const noexcept { return m_error_type; }
@@ -92,7 +93,7 @@ namespace sz
 
         protected:
         int m_error_code;
-        std::string_view m_error_type; // substring of __PRETTY_FUNCTION__ in gcc/clang
+        std::string m_error_type;
         std::source_location m_location;
         std::string m_msg;
     };
