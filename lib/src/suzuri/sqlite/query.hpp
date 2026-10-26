@@ -225,26 +225,29 @@ namespace sz::sqlite
     template <typename... Binds, std::size_t N>
     inline bool database_query::has_same_binds(Binds&&... binds) const
     {
-        if constexpr (N == 1 && is_vector<std::tuple_element_t<0, std::tuple<Binds...>>>)
+        if constexpr (N > 0)
         {
-            return has_same_binds(AS_VECTOR(binds));
-        }
-        else if constexpr (N)
-        {
-            if (m_binds.size() != N)
-            { return false; }
-            else 
+            if constexpr (N == 1 && is_vector<std::tuple_element_t<0, std::tuple<Binds...>>>)
             {
-                return [&]<std::size_t... I>(std::index_sequence<I...>) constexpr -> bool
-                {
-                    std::array<variant, N> incoming{variant(binds)...};
-                    return ((incoming[I] == m_binds[I]) && ...);
-                }(std::index_sequence_for<Binds...>{});
+                return has_same_binds(AS_VECTOR(binds));
             }
-        }
+            else
+            {
+                if (m_binds.size() != N)
+                { return false; }
+                else 
+                {
+                    return [&]<std::size_t... I>(std::index_sequence<I...>) constexpr -> bool
+                    {
+                        std::array<variant, N> incoming{variant(binds)...};
+                        return ((incoming[I] == m_binds[I]) && ...);
+                    }(std::index_sequence_for<Binds...>{});
+                }
+            }
 
-        if (m_binds.size())
-        { return false; }
+            if (m_binds.size())
+            { return false; }
+        }
 
         return true;
     }
@@ -291,7 +294,7 @@ namespace sz::sqlite
             else
             { bind_status = m_bind_int64(bind_index, val); }
         }
-        else if constexpr (std::is_convertible_v<T, std::string>)
+        else if constexpr (std::is_convertible_v<T, std::string> || std::is_same_v<T, std::string_view>)
         { bind_status = m_bind_text(bind_index, static_cast<std::string>(val).c_str()); }
         else
         { return bind_status; }
