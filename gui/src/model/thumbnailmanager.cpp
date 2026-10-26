@@ -3,12 +3,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include <QtCore/QFileInfo>
+#include <QtCore/QBuffer>
+#include <QtCore/QByteArray>
 #include <QtGui/QImageReader>
 #include <QtGui/QPixmap>
-#include <QtConcurrent/QtConcurrentRun>
 #include <suzuri/entity/common.hpp>
 #include <suzuri/utility/config_utils.hpp>
 #include <suzuri/utility/thumbnail.hpp>
+#include <suzuri/plugin/plugin_manager.hpp>
 #include "utility/sizing.hpp"
 #include "thumbnailmanager.hpp"
 
@@ -17,6 +19,7 @@ namespace rin
     thumbnail_manager::thumbnail_manager(const std::filesystem::path& db_path, QObject* parent) :
         QThread(parent), m_db(db_path, true)
     {
+        m_init_thumbnailers();
         start(QThread::Priority::LowPriority);
         m_working = false;
         m_do_interrupt.clear();
@@ -142,6 +145,44 @@ namespace rin
         m_continue.wakeAll();
     }
 
+    void thumbnail_manager::m_init_thumbnailers()
+    {
+        auto* pm = sz::plugin_manager::get();
+
+        for (const auto& [path, index] : pm->find("thumbnailer"))
+        {
+            std::shared_ptr<sz::thumbnailer> t = nullptr;
+            if (auto plugin = pm->plugin(path, index); plugin)
+            {
+                t.reset(static_cast<sz::thumbnailer*>(*plugin));
+            }
+            else
+            { sz::check_error(plugin); }
+
+            if (t)
+            {
+                for (const std::string& ext : t->descriptor().subfeatures("formats"))
+                {
+                    if (!m_thumbnailers.contains(ext))
+                    {
+                        m_thumbnailers.emplace(ext, t);
+                    }
+                }
+            }
+        }
+    }
+
+    bool thumbnail_manager::m_has_thumbnailer(const std::string& ext) const
+    {
+        return m_thumbnailers.contains(ext);
+    }
+
+    // does no checks
+    std::shared_ptr<sz::thumbnailer>& thumbnail_manager::m_thumbnailer_for_extension(const std::string& ext)
+    {
+        return m_thumbnailers.at(ext);
+    }
+
     // for file entities only
     bool thumbnail_manager::m_is_supported_entity(const std::filesystem::path& path) const
     {
@@ -172,14 +213,20 @@ namespace rin
 
     QPixmap thumbnail_manager::m_create_thumbnail(const thumbnail_descriptor& d)
     {
-        const bool is_file = d.entity_type == sz::entity_type::File;
+        using enum sz::entity_type;
+        
+        const std::string id = d.id.toStdString();
         QPixmap thumb;
         
-        if (is_file)
+        if (d.entity_type == File)
         {
-            QImageReader reader(d.id);
-            reader.setScaledSize(m_thumbnail_size(d));
-            thumb = QPixmap::fromImageReader(&reader);
+            if (const std::string ext = std::filesystem::path(id).extension().string().substr(1); m_has_thumbnailer(ext))
+            {
+                auto& t = m_thumbnailer_for_extension(ext);
+                const auto [w, h] = m_thumbnail_size(d);
+                auto bytes = QByteArray::fromStdString(t->create_thumbnail(id, w, h));
+                thumb.loadFromData(bytes, "PNG");
+            }
         }
         // TODO
 

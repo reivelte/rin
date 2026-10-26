@@ -15,6 +15,7 @@
 #include <QtCore/QThread>
 #include <QtCore/QModelIndex>
 #include <suzuri/entity/database.hpp>
+#include <suzuri/plugin/plugin.hpp>
 #include "common.hpp"
 #include "entity.hpp"
 
@@ -53,6 +54,9 @@ namespace rin
         void m_remove(const int key);
         void m_request_abort();
 
+        void m_init_thumbnailers();
+        bool m_has_thumbnailer(const std::string& ext) const;
+        std::shared_ptr<sz::thumbnailer>& m_thumbnailer_for_extension(const std::string& ext);
         bool m_is_supported_entity(const std::filesystem::path& path) const;
         bool m_is_supported_entity(QString entity_uri) const;
         QString m_thumbnail_cache_path(const thumbnail_descriptor& d) const;
@@ -74,6 +78,7 @@ namespace rin
         sz::entity_database m_db; // in read_only mode
         std::deque<int> m_queue;
         std::unordered_map<int, job_batch> m_batches;
+        std::unordered_map<std::string, std::shared_ptr<sz::thumbnailer>> m_thumbnailers;
         int m_seed;
 
     };

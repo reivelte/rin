@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include "../plugin/plugin_manager.hpp"
 #include "ctl.hpp"
 
 namespace sz
@@ -38,12 +39,16 @@ namespace sz
         if (ensure_directory_exists(state_config_path.parent_path()))
         { s_instance->set_config(state_config_path, State); }
 
+        plugin_manager::init();
     }
 
     void core_ctl::exit()
     {
         if (s_instance)
-        { delete s_instance; }
+        {
+            plugin_manager::exit();
+            delete s_instance;
+        }
 
         s_instance = nullptr;
     }

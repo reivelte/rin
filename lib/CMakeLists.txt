@@ -79,13 +79,17 @@ set(public_headers #!BEGIN: HEADER LIST
   src/${PROJECT_NAME}/sqlite/database.hpp
   src/${PROJECT_NAME}/utility/files.hpp
   src/${PROJECT_NAME}/utility/hash.hpp
+  src/${PROJECT_NAME}/utility/reference_counter.hpp
   src/${PROJECT_NAME}/utility/string.hpp
   src/${PROJECT_NAME}/utility/domain.hpp
   src/${PROJECT_NAME}/utility/thumbnail.hpp
   src/${PROJECT_NAME}/utility/config_utils.hpp
   src/${PROJECT_NAME}/utility/json.hpp
+  src/${PROJECT_NAME}/utility/shared_library.hpp
   src/${PROJECT_NAME}/thread/guarded_ptr.hpp
   src/${PROJECT_NAME}/metadata/tags.hpp
+  src/${PROJECT_NAME}/plugin/plugin_manager.hpp
+  src/${PROJECT_NAME}/plugin/plugin.hpp
 ) #!END: HEADER LIST
 
 set(sources #!BEGIN: SOURCE LIST
@@ -96,14 +100,18 @@ set(sources #!BEGIN: SOURCE LIST
   src/${PROJECT_NAME}/core/ctl.cpp
   src/${PROJECT_NAME}/sqlite/database.cpp
   src/${PROJECT_NAME}/sqlite/query.cpp
+  src/${PROJECT_NAME}/utility/reference_counter.cpp
   src/${PROJECT_NAME}/utility/string.cpp
   src/${PROJECT_NAME}/utility/files.cpp
   src/${PROJECT_NAME}/utility/hash.cpp
   src/${PROJECT_NAME}/utility/thumbnail.cpp
   src/${PROJECT_NAME}/utility/domain.cpp
+  src/${PROJECT_NAME}/utility/shared_library.cpp
   src/${PROJECT_NAME}/utility/config_utils.cpp
   src/${PROJECT_NAME}/utility/json.cpp
   src/${PROJECT_NAME}/metadata/tags.cpp
+  src/${PROJECT_NAME}/plugin/plugin_manager.cpp
+  src/${PROJECT_NAME}/plugin/plugin.cpp
 )#!END: SOURCE LIST
 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${sources}) # for properly displying directory structure in IDEs
