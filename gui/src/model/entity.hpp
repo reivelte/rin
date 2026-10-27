@@ -82,6 +82,7 @@ namespace rin
         inline reflexive_entity(const QString& name, sz::entity_type type, bool is_indexed = false, bool has_children = false);
         ~reflexive_entity() = default;
 
+        inline bool operator==(const reflexive_entity& rhs) const;
         inline bool operator==(const QString& rhs) const;
         inline bool operator!=(const QString& rhs) const;
 
@@ -130,6 +131,11 @@ namespace rin
         m_is_indexed(is_indexed), m_has_children(has_children)
     {
         set_attribute(Name, name);
+    }
+
+    inline bool reflexive_entity::operator==(const reflexive_entity& rhs) const
+    {
+        return (attribute<QString>(Name) == rhs.attribute<QString>(Name)) && (parent_key() == rhs.parent_key());
     }
 
     inline bool reflexive_entity::operator==(const QString& rhs) const
