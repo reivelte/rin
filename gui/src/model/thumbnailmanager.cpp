@@ -33,6 +33,9 @@ namespace rin
 
     int thumbnail_manager::submit_batch(const std::vector<thumbnail_descriptor>& batch)
     {
+        if (batch.empty())
+        { return 0; }
+        
         QMutexLocker locker(&m_mutex);
 
         const int key = ++m_seed;
