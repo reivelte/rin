@@ -76,6 +76,7 @@ namespace rin
         
         protected slots:
         void refresh_items(const QModelIndex& first, const QModelIndex last, const QList<int>& roles);
+        void refresh_item(const reflexive_entity& e, sz::thumbnail_target_size thumb_size);
 
         private:
         void m_recenter_thumbnail();
@@ -85,6 +86,7 @@ namespace rin
 
         private:
         using enum entity_attribute_type;
+        using enum sz::thumbnail_target_size;
         QList<QModelIndex> m_items;
         
         entity_model* m_model;
@@ -94,6 +96,7 @@ namespace rin
         QTextLayout m_name_layout;
         QFont m_name_font;
         QRect m_name_rect;
+        sz::thumbnail_target_size m_thumb_size;
         int m_padding;
     };
     

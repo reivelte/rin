@@ -191,6 +191,7 @@ namespace rin
         ui_panel(parent),
         m_items(), m_model(model),
         m_thumbnail(nullptr),
+        m_thumb_size(Large_256px),
         m_padding(4)
     {
         if (!m_model)
@@ -203,6 +204,8 @@ namespace rin
         m_name_font.setPointSize(m_name_font.pointSize() + 2);
         
         m_view = new entity_metadata_view(this, m_model, m_padding);
+
+        connect(m_model, &entity_model::thumbnail_available, this, &details_panel::refresh_item);
     }
 
     details_panel::~details_panel()
@@ -214,20 +217,22 @@ namespace rin
         clear();
         if (m_model->valid_index(index))
         {
+            const QSize widget_size = size();
             const auto& e = m_model->at(index);
             m_items.push_back(index);
 
-            if (e.has_attribute(Icon))
+            if (m_model->has_thumbnail_loaded(index, m_thumb_size))
+            { m_set_thumbnail(m_model->thumbnail(e, m_thumb_size)); }
+            else
             {
-                // calling model->data() instead of e.attribute() allows us to get an entity thumbnail if one exists
-                auto icon = qvariant_cast<QIcon>(m_model->data(index, Qt::ItemDataRole::DecorationRole));
+                if (m_model->has_thumbnail(index))
+                { m_model->request_thumbnails({index}, m_thumb_size); }
 
-                // TODO: request an appropriate thumbnail from thumb manager for the current size of this widget
-                const auto s = rin::fit_under(size(), icon.actualSize(size(), QIcon::Mode::Normal, QIcon::State::On));
-                m_set_thumbnail(icon.pixmap(s));
+                auto icon = qvariant_cast<QIcon>(m_model->data(index, Qt::ItemDataRole::DecorationRole));
+                const QSize icon_size = rin::fit_under(widget_size, icon.actualSize(widget_size, QIcon::Mode::Normal, QIcon::State::On));
+                m_set_thumbnail(icon.pixmap(icon_size));
             }
             m_set_name(e.attribute<QString>(Name));
-
             m_view->set_entity(index);
         }
         m_adjust_widget_geometries();
@@ -261,7 +266,10 @@ namespace rin
     void details_panel::resizeEvent(QResizeEvent* event)
     {
         ui_panel::resizeEvent(event);
-
+        const auto [w, h] = event->size();
+        const int s = std::min(w, h);
+        m_thumb_size = sz::to_thumbnail_target_size(s, s);
+        m_thumbnail->set_target_size(m_thumb_size);
         m_recenter_thumbnail();
         m_adjust_widget_geometries();
     }
@@ -269,6 +277,24 @@ namespace rin
     void details_panel::mouseMoveEvent(QMouseEvent* event)
     {
         ui_panel::mouseMoveEvent(event);
+    }
+
+    // TODO
+    void details_panel::refresh_items(const QModelIndex& first, const QModelIndex last, const QList<int>& roles)
+    {
+        Q_UNUSED(roles);
+        Q_UNUSED(first);
+        Q_UNUSED(last);
+    }
+
+    void details_panel::refresh_item(const reflexive_entity& e, sz::thumbnail_target_size thumb_size)
+    {
+        if (m_items.size() && (m_model->at(m_items[0]) == e) && (thumb_size == m_thumb_size))
+        {
+            m_set_thumbnail(m_model->thumbnail(e, m_thumb_size));
+            m_adjust_widget_geometries();
+            update();
+        }
     }
 
     void details_panel::m_recenter_thumbnail()
@@ -306,14 +332,6 @@ namespace rin
 
         m_view->move(QPoint(0, used_height));
         m_view->resize(w, height() - used_height);
-    }
-
-    // TODO
-    void details_panel::refresh_items(const QModelIndex& first, const QModelIndex last, const QList<int>& roles)
-    {
-        Q_UNUSED(roles);
-        Q_UNUSED(first);
-        Q_UNUSED(last);
     }
 
 } // namespace rin
