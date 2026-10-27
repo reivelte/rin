@@ -9,32 +9,25 @@
 
 namespace rin
 {
-    ui_image::ui_image(QWidget* parent, const QPixmap& img) :
+    ui_image::ui_image(QWidget* parent) :
         QFrame(parent),
-        m_image(QPixmap()), m_image_rect(),
-        m_target_size(std::nullopt),
-        m_aspect(0)
+        m_image(), m_image_rect(),
+        m_aspect(0),
+        m_auto_resize(true)
     {
         setFrameStyle(QFrame::Shape::Box | QFrame::Shadow::Plain);
         setLineWidth(1);
         
-        if (!img.isNull())
-        { set_image(img); }
+        set_image(QPixmap());
     }
 
     ui_image::~ui_image()
     {
     }
 
-    void ui_image::set_target_size(std::optional<sz::thumbnail_target_size> target_size)
+    void ui_image::set_auto_resize(bool enabled)
     {
-        if (target_size)
-        {
-            m_target_size = *target_size;
-            m_resize_to_target(*m_target_size);
-        }
-        else
-        { m_target_size = std::nullopt; }
+        m_auto_resize = enabled;
     }
 
     void ui_image::set_image(const QPixmap& img)
@@ -42,16 +35,15 @@ namespace rin
         m_image = img;
         if (m_image.isNull())
         {
-            m_resize_to_target(m_target_size ? *m_target_size : Large_256px);
             m_image_rect = QRect();
         }
         else
         {
             m_aspect = static_cast<qreal>(img.width()) / static_cast<qreal>(img.height());
-            if (m_target_size)
-            { m_resize_to_target(*m_target_size); }
-            else
+
+            if (m_auto_resize)
             { resize(img.size()); }
+
             m_adjust_image_rect(img);
         }
         update();
@@ -59,13 +51,7 @@ namespace rin
 
     QSize ui_image::sizeHint() const
     {
-        if (m_target_size)
-        {
-            const int s = sz::from_thumbnail_target_size(*m_target_size);
-            return {s, s};
-        }
-
-        if (m_image.isNull())
+        if (m_image.isNull() || (!m_auto_resize))
         { return QFrame::sizeHint(); }
 
         return m_image.size();
@@ -73,15 +59,18 @@ namespace rin
 
     bool ui_image::hasHeightForWidth() const
     {
-        return true;
+        if (m_auto_resize)
+        { return true; }
+        
+        return false;
     }
 
     int ui_image::heightForWidth(int w) const
     {
-        if (m_target_size)
-        { return sz::from_thumbnail_target_size(*m_target_size); }
+        if (m_auto_resize)
+        { return rin::height_for_width(w, m_aspect); }
 
-        return rin::height_for_width(w, m_aspect);
+        return QFrame::heightForWidth(w);
     }
 
     void ui_image::paintEvent(QPaintEvent* event)
@@ -125,17 +114,11 @@ namespace rin
         { m_adjust_image_rect(m_image); }
     }
 
-    void ui_image::m_resize_to_target(sz::thumbnail_target_size target)
-    {
-        const int s = sz::from_thumbnail_target_size(target);
-        resize(s, s);
-    }
-
     // assumes img is not null
     void ui_image::m_adjust_image_rect(const QPixmap& img)
     {
         m_image_rect = QRect(QPoint(), QSize(img.width(), img.height()));
-        if (m_target_size)
+        if (!m_auto_resize)
         {
             m_image_rect.setSize(rin::fit_under(size(), m_image_rect.size()));
             m_image_rect.moveCenter(rect().center());

@@ -197,7 +197,8 @@ namespace rin
         if (!m_model)
         { throw std::runtime_error("model was nullptr"); }
 
-        m_thumbnail = new ui_image(this, QPixmap());
+        m_thumbnail = new ui_image(this);
+        m_thumbnail->set_auto_resize(false);
         
         m_name_font = font();
         m_name_font.setBold(true);
@@ -266,10 +267,11 @@ namespace rin
     void details_panel::resizeEvent(QResizeEvent* event)
     {
         ui_panel::resizeEvent(event);
+        
         const auto [w, h] = event->size();
         const int s = std::min(w, h);
-        m_thumb_size = sz::to_thumbnail_target_size(s, s);
-        m_thumbnail->set_target_size(m_thumb_size);
+        
+        m_thumbnail->resize(s, s);
         m_recenter_thumbnail();
         m_adjust_widget_geometries();
     }
