@@ -320,20 +320,14 @@ namespace rin
         {
             if (const auto& e = m_item_for_index(index); e.has_attribute(Sizehint))
             {
-                const auto& name = e.attribute<QString>(Name);
-                const int key = m_key_for_index(index);
-                
-                if (m_has_thumbnail_loaded(name, key))
-                { continue; }
-
                 batch.emplace_back(thumbnail_descriptor{
                     .thumbnail{},
                     .id = e.has_attribute(Id) ? e.attribute<QString>(Id) : id_for_index(index),
-                    .entity_name = name,
+                    .entity_name = e.attribute<QString>(Name),
                     .original_size = e.attribute<QSize>(Sizehint),
                     .target_size = size,
                     .entity_type = e.type(),
-                    .node_key = key
+                    .node_key = m_key_for_index(index)
                 });
             }
         }
