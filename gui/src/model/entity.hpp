@@ -24,6 +24,8 @@
 
 namespace rin
 {
+    class entity_model;
+
     typedef std::unordered_set<QString> tag_set;
     typedef std::variant<
         tag_set,
@@ -106,8 +108,12 @@ namespace rin
         inline bool valid() const;
         inline sz::entity_type type() const noexcept;
 
+        protected:
+        inline void set_type(sz::entity_type type);
+
         private:
         using enum entity_attribute_type;
+        friend class entity_model;
         entity_attribute_map m_attributes;
         sz::entity_type m_type;
         int m_parent;
@@ -239,6 +245,11 @@ namespace rin
     inline sz::entity_type reflexive_entity::type() const noexcept
     {
         return m_type;
+    }
+
+    inline void reflexive_entity::set_type(sz::entity_type type)
+    {
+        m_type = type;
     }
 
 } // namespace rin
