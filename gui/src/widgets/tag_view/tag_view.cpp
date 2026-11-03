@@ -51,7 +51,7 @@ namespace rin
     std::vector<reflexive_entity> tag_view::tags() const
     {
         std::vector<reflexive_entity> ret;
-        const QModelIndex root = rootIndex();
+        const QModelIndex& root = m_index_for_view_concept;
         for (int i = 0; i < m_model->rowCount(root); ++i)
         {
             const auto& e = m_model->at(m_model->index(i, 0, root));
