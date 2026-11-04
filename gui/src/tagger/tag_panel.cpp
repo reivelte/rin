@@ -47,6 +47,10 @@ namespace rin
                     if (m_model->entity_exists(input))
                     {
                         // get entity from db
+                        reflexive_entity e = m_model->entity_from_id(input);
+                        
+                        assert(e.has_attribute(entity_attribute_type::Name));
+                        tags.push_back(e);
                     }
                     else
                     {
