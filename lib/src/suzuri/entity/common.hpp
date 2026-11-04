@@ -5,6 +5,8 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <string_view>
+#include <tuple>
 #include <sz_export.hpp>
 
 namespace sz
@@ -42,8 +44,9 @@ namespace sz
     static constexpr const std::string_view CONCEPT_URI_PREFIX = "concept://";
     static constexpr const std::string_view HTTPS_URI_PREFIX =   "https://";
 
-    SZ_API bool is_valid_tag(const std::string& tag);
+    SZ_API bool is_valid_tag(std::string_view tag);
     SZ_API std::string entity_uri(const std::string& id, entity_type type);
+    SZ_API std::tuple<std::string_view, sz::entity_type> id_from_uri(std::string_view uri);
     SZ_API std::string entity_platform_id(const std::string& id, entity_type type);
     
 } // namespace sz

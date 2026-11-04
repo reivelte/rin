@@ -17,6 +17,7 @@ set(SOURCES #!BEGIN: SOURCE LIST
   src/utility/painting.cpp
   src/tagger/tagger.cpp
   src/tagger/tag_panel.cpp
+  src/model/entity.cpp
   src/model/common.cpp
   src/model/thumbnailmanager.cpp
   src/model/entitymodel.cpp

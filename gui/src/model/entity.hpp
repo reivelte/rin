@@ -17,6 +17,7 @@
 #include <QtCore/QDir>
 #include <QtCore/QFileInfo>
 #include <QtCore/QMimeType>
+#include <QtCore/QMimeDatabase>
 #include <QtGui/QIcon>
 #include <suzuri/entity/database.hpp>
 #include <suzuri/entity/common.hpp>
@@ -80,6 +81,8 @@ namespace rin
     class reflexive_entity
     {
         public:
+        static reflexive_entity from_uri_or_id(QString x, sz::entity_database* db = nullptr, std::optional<QFileInfo> fsinfo = std::nullopt);
+
         inline reflexive_entity();
         inline reflexive_entity(const QString& name, sz::entity_type type, bool is_indexed = false, bool has_children = false);
         ~reflexive_entity() = default;
@@ -96,6 +99,8 @@ namespace rin
         ENT_ATTR_TMPL(T) void set_attribute(entity_attribute_type attr, const T& value);
         ENT_ATTR_TMPL(T) const T& attribute(entity_attribute_type attr = entity_attribute_type::Null_Attribute) const;
         ENT_ATTR_TMPL(T) T& attribute(entity_attribute_type attr = entity_attribute_type::Null_Attribute);
+
+        void fill_extended_attributes(sz::entity_database& db, const QMimeDatabase& mimedb, bool get_tag_set);
 
         inline const entity_attribute_map& attribute_map() const;
 

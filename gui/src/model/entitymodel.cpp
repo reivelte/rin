@@ -448,11 +448,24 @@ namespace rin
     }
 
     // returns true if the tag exists in the database
-    bool entity_model::entity_exists(const std::string& entity_id)
+    bool entity_model::entity_exists(const std::string& entity_id) const
     {
         sz::entity_database db(m_database_path, true);
         const bool exists = db.entity_exists(entity_id);
         return exists;
+    }
+
+    reflexive_entity entity_model::entity_from_id(const std::string& id) const
+    {
+        using enum sz::entity_type;
+        
+        static const QMimeDatabase mimedb;
+        sz::entity_database db(m_database_path, true);
+        
+        auto e = reflexive_entity::from_uri_or_id(QString::fromStdString(id), &db);
+        e.fill_extended_attributes(db, mimedb, true);
+        
+        return e;
     }
 
     QModelIndex entity_model::index(int row, int column, const QModelIndex& parent) const

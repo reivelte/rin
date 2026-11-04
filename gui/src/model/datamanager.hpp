@@ -27,43 +27,113 @@ namespace rin
 {
     namespace detail
     {
-        static constexpr std::string_view s_query_cmd_tagsof = "!tagsof:";
-        static constexpr std::string_view s_query_cmd_taglist = "!taglist:";
+        static constexpr const std::string_view s_query_cmd_taglist = "!taglist:";
 
-        template <typename T>
-        struct deduce_from {};
-
-        typedef sz::sqlite::database_query database_source;    
+        /* ******************** 
+        Begin definitions for data sources
+        ******************** */
+        typedef sz::sqlite::database_query database_source;
         
         struct filesystem_source
         {
             QDirListing dir;
             QDirListing::const_iterator it;
         };
-
+        
         struct concept_source
         {
             QList<QUrl> urls{};
             int position{};
         };
+        /* ******************** 
+        End definitions for data sources
+        ******************** */
 
+        template <typename T>
+        struct data_source_container {};
+
+        /* ******************** 
+        Begin definitions for data source containers
+        
+        These include defining how to advance the position in and how to retrieve
+        data from sources. Template specializations are used to avoid the
+        overhead of inheritance.
+        ******************** */
         template <>
-        struct deduce_from<QFileInfo>
+        struct data_source_container<database_source>
         {
-            typedef filesystem_source ValueType;
+            database_source src;
+            
+            data_source_container(database_source&& s) : src(std::move(s)) {}
+            
+            inline operator database_source&() { return src; }
+            inline data_source_container<database_source>& operator++()
+            {
+                ++src;
+                return *this;
+            }
+
+            inline bool has_data() const { return src.good(); }
+            inline QString id_from_source() const { return QString::fromStdString(src.get<std::string>()); }
         };
 
         template <>
-        struct deduce_from<std::string>
+        struct data_source_container<filesystem_source>
         {
-            typedef database_source ValueType;
+            filesystem_source src;
+
+            data_source_container(filesystem_source&& s) : src(std::move(s)) {}
+            
+            inline operator filesystem_source&() { return src; }
+            inline data_source_container<filesystem_source>& operator++()
+            {
+                ++src.it;
+                return *this;
+            }
+
+            inline bool has_data() const { return src.it != src.dir.end(); }
+            inline QString id_from_source() const { return src.it->absoluteFilePath(); }
         };
+
+        template <>
+        struct data_source_container<concept_source>
+        {
+            concept_source src;
+
+            data_source_container(concept_source&& s) : src(std::move(s)) {}
+            data_source_container(const concept_source& s) : src(s) {}
+            data_source_container(concept_source& s) : src(s) {}
+            
+            inline operator concept_source&() { return src; }
+            inline data_source_container<concept_source>& operator++()
+            {
+                ++src.position;
+                return *this;
+            }
+
+            inline bool has_data() const { return std::cmp_less(src.position, src.urls.size()); }
+            inline QString id_from_source() const
+            {
+                // TODO: other url types
+                return src.urls[src.position].toLocalFile(); 
+            }
+        };
+
+        /* ******************** 
+        End definitions for data source containers
+        ******************** */
 
         template <typename T>
         concept is_data_source = 
             std::same_as<T, database_source> ||
             std::same_as<T, filesystem_source> ||
             std::same_as<T, concept_source>;
+
+        typedef std::variant<
+            data_source_container<database_source>,
+            data_source_container<filesystem_source>,
+            data_source_container<concept_source>
+        > data_source_variant;
 
     } // namespace rin::detail
 
@@ -114,20 +184,27 @@ namespace rin
         bool event(QEvent* e) override;
 
         private: // internal data structures to make life easier
-        class data_source : public std::variant<
-            detail::filesystem_source, detail::database_source, detail::concept_source
-        >
+        class data_source : public detail::data_source_variant
         {
-            using base = std::variant<detail::filesystem_source, detail::database_source, detail::concept_source>;
+            using base = detail::data_source_variant;
             using base::base;
             using enum query_descriptor::query_type;
 
             public:
-            explicit data_source(detail::database_source&& src) : base(std::move(src)), m_type(Indexed) { }
+            explicit data_source(detail::database_source&& src) : base(std::move(src)), m_type(Indexed)
+            {
+                // move the query object to the first valid row, if there is one
+                auto& data = std::get<detail::data_source_container<detail::database_source>>(*this);
+                ++data.src;
+            }
             data_source(const detail::database_source&) = delete;
             data_source(detail::database_source&) = delete;
             
-            explicit data_source(detail::filesystem_source&& src) : base(std::move(src)), m_type(Filesystem) { }
+            explicit data_source(detail::filesystem_source&& src) : base(std::move(src)), m_type(Filesystem)
+            {
+                auto& data = std::get<detail::data_source_container<detail::filesystem_source>>(*this);
+                data.src.it = data.src.dir.begin();
+            }
             data_source(const detail::filesystem_source&) = delete;
             data_source(detail::filesystem_source&) = delete;
 
@@ -135,27 +212,39 @@ namespace rin
             data_source(detail::concept_source&& src) : base(std::move(src)), m_type(Concept) { }
             data_source(detail::concept_source& src) : base(src), m_type(Concept) { }
 
+            operator detail::database_source&() { return std::get<detail::data_source_container<detail::database_source>>(*this).src; }
+            operator detail::filesystem_source&() { return std::get<detail::data_source_container<detail::filesystem_source>>(*this).src; }
+            operator detail::concept_source&() { return std::get<detail::data_source_container<detail::concept_source>>(*this).src; }
+
             constexpr query_descriptor::query_type type() const noexcept { return m_type; }
-            inline bool at_end() const;
+
+            template <detail::is_data_source Source>
+            inline bool has_data() const
+            {
+                return std::get<detail::data_source_container<Source>>(*this).has_data();
+            }
+
+            inline bool has_data() const
+            {
+                using namespace rin::detail;
+                switch (m_type)
+                {
+                case Filesystem: return std::get<data_source_container<filesystem_source>>(*this).has_data();
+                case Indexed: return std::get<data_source_container<database_source>>(*this).has_data();
+                case Concept: return std::get<data_source_container<concept_source>>(*this).has_data();
+                default: break;
+                }
+                return false;
+            }
+
+            template <detail::is_data_source Source>
+            inline QString id_from_source() const
+            {
+                return std::get<detail::data_source_container<Source>>(*this).id_from_source();
+            }
 
             private:
             query_descriptor::query_type m_type;
-        };
-
-        class descriptor : public std::variant<query_descriptor, fetch_descriptor>
-        {
-            using base = std::variant<query_descriptor, fetch_descriptor>;
-            using base::base;
-            using enum query_descriptor::query_mode;
-
-            public:
-            explicit descriptor(query_descriptor&& qd) : base(std::move(qd)), m_mode(Read) {}
-            explicit descriptor(fetch_descriptor&& fd) : base(std::move(fd)), m_mode(Fetch) {}
-
-            constexpr query_descriptor::query_mode mode() const noexcept { return m_mode; }
-
-            private:
-            query_descriptor::query_mode m_mode;
         };
         
         void run() override;
@@ -176,8 +265,8 @@ namespace rin
         [[nodiscard]] query_descriptor m_create_query_descriptor(const QString& entity_id, const sz::metadata::parameters& args) const;
         query_descriptor m_create_fetch_query(const QString& text, const std::vector<entity_model_url>& urls, fetch_action action, bool update_only);
 
-        inline reflexive_entity m_make_item(const QString& parent_id, const QString& id, const QFileInfo& fsinfo, sz::entity_type type, bool is_indexed, bool fill_extended_attributes);
-        inline void m_fill_extended_item_attributes(reflexive_entity& e, const QString& id, bool is_file, bool is_indexed);
+        inline reflexive_entity m_make_entity(const QString& parent_id, const QString& id, std::optional<QFileInfo> fsinfo = std::nullopt);
+        inline void m_fill_extended_item_attributes(reflexive_entity& e);
         bool m_run_read_query(entity_tree_node& node);
         bool m_run_extended_read_query(entity_tree_node& node, int& position);
         bool m_run_sort_query(entity_tree_node& node, const std::unordered_map<int, int>& keys);
@@ -195,15 +284,13 @@ namespace rin
         QFileSystemWatcher* m_create_watcher();
 
         template <detail::is_data_source Source>
-        void m_iterate_source(Source& src, entity_tree_node& node);
-
-        template <detail::is_data_source Source> 
-        bool m_push_result(reflexive_entity&& x, QElapsedTimer& t, Source& source, entity_tree_node& node, int64_t& retrieved_this_time, int& start);
+        void m_iterate_source(entity_data_manager::data_source& data, entity_tree_node& node);
 
         template <detail::is_data_source Source>
-        reflexive_entity m_item_from_source(const query_descriptor& qd, const Source& src, bool is_taglist_query = false);
+        bool m_push_result(reflexive_entity&& x, QElapsedTimer& t, detail::data_source_container<Source>& src, entity_tree_node& node, int64_t& retrieved_this_time, int& start);
 
         private:
+        using enum entity_attribute_type;
         // accessed by multiple threads:
         mutable QMutex m_mutex;
         std::atomic_flag m_do_interrupt; // callers set this when they want to request an interruption to query processing
@@ -239,135 +326,43 @@ namespace rin
         bool m_watcher_enabled;
     };
 
-    // template <detail::is_data_source Source>
-    // inline constexpr bool entity_data_manager::data_source::next()
-    // {
-    //     if constexpr (std::same_as<Source, detail::database_source>)
-    //     {
-    //         auto& db_src = std::get<detail::database_source>(*this);
-    //         ++db_src;
-    //         return db_src.good();
-    //     }
-    //     else
-    //     {
-    //         auto& dir_src = std::get<detail::filesystem_source>(*this);
-    //         ++dir_src.it;
-    //         return dir_src.it != dir_src.dir.end();
-    //     }
-    // }
-
-    // template <detail::is_data_source Source>
-    // inline constexpr bool entity_data_manager::data_source::good() const
-    // {
-    //     if constexpr (std::same_as<Source, detail::database_source>)
-    //     {
-    //         const auto& db_src = std::get<detail::database_source>(*this);
-    //         return db_src.good();
-    //     }
-    //     else
-    //     {
-    //         const auto& x = std::get<detail::filesystem_source>(*this);
-    //         return x.it != x.dir.end();
-    //     }
-    // }
-
-    // template <typename T, typename Source> requires (std::same_as<T, QFileInfo> || std::same_as<T, std::string>)
-    // inline constexpr T entity_data_manager::data_source::get() const
-    // {
-    //     if constexpr (std::same_as<Source, detail::filesystem_source>)
-    //     {
-    //         const auto& dir_src = std::get<detail::filesystem_source>(*this);
-    //         return dir_src.it->fileInfo();
-    //     }
-    //     else
-    //     {
-    //         const auto& db_src = std::get<detail::database_source>(*this);
-    //         return db_src.column<T>();
-    //     }
-    // }
-
-    // template <detail::is_data_source Source>
-    // inline constexpr bool entity_data_manager::data_source::at_start() const
-    // {
-    //     if constexpr (std::same_as<Source, detail::database_source>)
-    //     {
-    //         const auto& db_src = std::get<detail::database_source>(*this);
-    //         return db_src.status() == sz::sqlite::status_code::OK;
-    //     }
-    //     // this function is not used for filesystem_source
-    //     return true;
-    // }
-
-    inline bool entity_data_manager::data_source::at_end() const
-    {
-        if (m_type == Indexed)
-        {
-            const auto& db_src = std::get<detail::database_source>(*this);
-            return db_src.status() == sz::sqlite::status_code::Done;
-        }
-        else if (m_type == Filesystem)
-        {
-            const auto& x = std::get<detail::filesystem_source>(*this);
-            return x.it == x.dir.end();
-        }
-        return true;
-    }
-
     template <detail::is_data_source Source>
-    inline void entity_data_manager::m_iterate_source(Source& src, entity_tree_node& node)
+    inline void entity_data_manager::m_iterate_source(entity_data_manager::data_source& x, entity_tree_node& node)
     {
         using namespace rin::detail;
+        using enum query_descriptor::query_type;
         QElapsedTimer timer;
         int64_t retrieved = 0;
         int start = node.size();
-
         // timer.start();
-        if constexpr (std::same_as<Source, filesystem_source>)
+
+        data_source_container<Source>& src = std::get<data_source_container<Source>>(x);
+        while (src.has_data())
         {
-            auto& fs = static_cast<filesystem_source&>(src);
-            while (fs.it != fs.dir.end())
+            std::optional<QFileInfo> info = std::nullopt;
+            if (x.type() == Filesystem)
             {
-                if (m_push_result(m_item_from_source(node.descriptor, fs, false), timer, fs, node, retrieved, start))
-                { break; }
+                filesystem_source& raw = x;
+                info = raw.it->fileInfo();
             }
-        }
-        else if constexpr (std::same_as<Source, database_source>)
-        {
-            // TODO: handle cases where the database is busy/locked
-            auto& db_src = static_cast<database_source&>(src);
-            const bool is_taglist_query = node.descriptor.text.startsWith(s_query_cmd_taglist.data(), Qt::CaseInsensitive);
+            reflexive_entity e = m_make_entity(node.descriptor.text, src.id_from_source(), info);
             
-            if (db_src.status() == sz::sqlite::status_code::OK)
-            { ++db_src; } // the very beginning of a db query object does not point to a valid row, lets advance now
-
-            while (db_src.good())
-            {
-                if (m_push_result(m_item_from_source(node.descriptor, db_src, is_taglist_query), timer, db_src, node, retrieved, start))
-                { break; }
-            }
-        }
-        else if constexpr (std::same_as<Source, concept_source>)
-        {
-            auto& data = static_cast<concept_source&>(src);
-
-            for ( ; std::cmp_less(data.position, data.urls.size()); )
-            {
-                if (m_push_result(m_item_from_source(node.descriptor, data, false), timer, data, node, retrieved, start))
-                { break; }
-            }
+            if (m_push_result(std::move(e), timer, src, node, retrieved, start))
+            { break; }
         }
     }
 
     template <detail::is_data_source Source>
-    inline bool entity_data_manager::m_push_result(reflexive_entity&& e, QElapsedTimer& t, Source& source, entity_tree_node& node, int64_t& retrieved_this_time, int& start)
+    inline bool entity_data_manager::m_push_result(reflexive_entity&& e, QElapsedTimer& t, detail::data_source_container<Source>& src, entity_tree_node& node, int64_t& retrieved_this_time, int& start)
     {
         using enum entity_tree_node_state;
         using enum entity_attribute_type;
+        
+        const QString name = e.attribute<QString>(Name);
         // const bool time_is_up = t.hasExpired(static_cast<qint64>(m_deadline));
         const bool time_is_up = false;
         const bool do_interrupt = m_do_interrupt.test();
-        
-        const QString name = e.attribute<QString>(Name);
+        bool ret = false;
 
         if (const QString ft = node.descriptor.full_text(); m_invalidated.contains(ft) && m_invalidated[ft].contains(name))
         { m_invalidated[ft].erase(name); }
@@ -376,31 +371,11 @@ namespace rin
         m_adjust_count(node.descriptor, e, true); // descriptors are always redone for invalidates
         
         if (!node.contains(name))
-        {
-            node.insert(std::move(e));
-        }
+        { node.insert(std::move(e)); }
         
         ++retrieved_this_time;
-        
-        bool ret = false;
-        if constexpr (std::same_as<Source, detail::database_source>)
-        {
-            auto& db_src = static_cast<detail::database_source&>(source);
-            ++db_src;
-            ret = !db_src.good();
-        }
-        else if constexpr (std::same_as<Source, detail::filesystem_source>)
-        {
-            auto& dir_src = static_cast<detail::filesystem_source&>(source);
-            ++dir_src.it;
-            ret = dir_src.it == dir_src.dir.end();
-        }
-        else if constexpr(std::same_as<Source, detail::concept_source>)
-        {
-            auto& concept_src = static_cast<detail::concept_source&>(source);
-            ++concept_src.position;
-            ret = concept_src.position >= concept_src.urls.size();
-        }
+        ++src;
+        ret = !src.has_data();
         ret = (!ret ? (do_interrupt || time_is_up || std::cmp_greater_equal(retrieved_this_time, m_batchsize)) : ret);
         if (ret)
         {
@@ -425,39 +400,6 @@ namespace rin
             }
         }
         return ret;
-    }
-
-    template <detail::is_data_source Source>
-    inline reflexive_entity entity_data_manager::m_item_from_source(const query_descriptor& qd, const Source& src, bool is_taglist_query)
-    {
-        using namespace rin::detail;
-        // in the call to m_make_item(), we pass false for 'fill_extended_attributes' here in all cases, so the value of is_indexed doesn't matter
-        if constexpr (std::same_as<Source, filesystem_source>)
-        {
-            Q_UNUSED(is_taglist_query);
-            const auto& fs_src = static_cast<const filesystem_source&>(src);
-            const QFileInfo fsinfo = fs_src.it->fileInfo();
-            const QString id = fsinfo.absoluteFilePath();
-            return m_make_item(qd.text, id, fsinfo, sz::entity_type::File, false, false);
-        }
-        else if constexpr (std::same_as<Source, detail::database_source>)
-        {
-            const auto& db_src = static_cast<const database_source&>(src);
-            const QString id_qstr = QString::fromStdString(db_src.get<std::string>());
-            const QFileInfo fsinfo = is_taglist_query ? QFileInfo() : QFileInfo(id_qstr);
-            const bool is_file = !is_taglist_query;
-            return m_make_item(qd.text, id_qstr, fsinfo, is_file ? sz::entity_type::File : sz::entity_type::Tag, true, false);
-        }
-        else if constexpr (std::same_as<Source, concept_source>)
-        {
-            const auto& data = static_cast<const concept_source&>(src);
-            const auto& url = data.urls.at(data.position);
-            
-            // TODO: other url types. for now we assume every url points to a filesystem location
-            const QString path = url.toLocalFile();
-            const QFileInfo info(path);
-            return m_make_item(qd.text, path, info, sz::entity_type::File, false, false);
-        }
     }
 
 } // namespace rin

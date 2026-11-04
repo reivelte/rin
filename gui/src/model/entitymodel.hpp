@@ -102,7 +102,8 @@ namespace rin
         QString id_for_index(const QModelIndex& index) const;
         const reflexive_entity& at(const QModelIndex& index);
         item_properties properties(const QModelIndex& parent) const;
-        bool entity_exists(const std::string& entity_id);
+        bool entity_exists(const std::string& entity_id) const;
+        reflexive_entity entity_from_id(const std::string& id) const;
 
         // reimplemented functions
         QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;

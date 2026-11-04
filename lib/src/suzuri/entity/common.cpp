@@ -8,13 +8,13 @@
 
 namespace sz
 {
-    bool is_valid_tag(const std::string& tag)
+    bool is_valid_tag(std::string_view tag)
     {
-        if (std::find(tag.begin(), tag.end(), ',') != tag.end() ||
+        return !(
+            std::find(tag.begin(), tag.end(), ',') != tag.end() ||
             std::find(tag.begin(), tag.end(), '|') != tag.end() ||
-            std::find(tag.begin(), tag.end(), '~') != tag.end()) 
-        { return false; }
-        return true;
+            std::find(tag.begin(), tag.end(), '~') != tag.end()
+        );
     }
 
     std::string entity_uri(const std::string& id, entity_type type)
@@ -30,6 +30,21 @@ namespace sz
         case Tag:       { prefix = TAG_URI_PREFIX; break; }
         }
         return prefix + id;
+    }
+
+    std::tuple<std::string_view, sz::entity_type> id_from_uri(std::string_view uri)
+    {
+        using enum entity_type;
+        
+        size_t subs = 0;
+        auto type = Invalid;
+        
+        if (uri.starts_with(CONCEPT_URI_PREFIX))    { subs = CONCEPT_URI_PREFIX.size(); type = Concept; }
+        else if (uri.starts_with(FILE_URI_PREFIX))  { subs = FILE_URI_PREFIX.size(); type = File; }
+        else if (uri.starts_with(TAG_URI_PREFIX))   { subs = TAG_URI_PREFIX.size(); type = Tag; }
+        // otherwise the uri is invalid
+
+        return { uri.substr(subs), type };
     }
 
     std::string entity_platform_id(const std::string& id, entity_type type)

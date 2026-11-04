@@ -510,7 +510,7 @@ namespace rin
         auto type = source.type();
         if (type == Filesystem)
         {
-            auto& fs_src = std::get<filesystem_source>(source);
+            filesystem_source& fs_src = source;
             while (fs_src.it != fs_src.dir.end())
             {
                 ++size;
@@ -529,12 +529,12 @@ namespace rin
         }
         else if (type == Indexed)
         {
-            const auto& db_src = std::get<database_source>(source);
+            database_source& db_src = source;
             size = db_src.size();
         }
         else if (type == Concept)
         {
-            const auto& data = std::get<concept_source>(source);
+            concept_source& data = source;
             size = static_cast<int64_t>(data.urls.size());
         }
         qd.size = size;
@@ -563,13 +563,9 @@ namespace rin
     {
         using namespace rin::detail;
         using enum query_descriptor::query_type;
+        
         if (source_type == Filesystem) // filesystem
-        {
-            entity_data_manager::data_source s(filesystem_source{.dir = QDirListing(short_text), .it = QDirListing::const_iterator()});
-            auto& dirsource = std::get<filesystem_source>(s);
-            dirsource.it = dirsource.dir.begin();
-            return s;
-        }
+        { return entity_data_manager::data_source(filesystem_source{.dir = QDirListing(short_text), .it = QDirListing::const_iterator()}); }
         
         if (const QFileInfo info(short_text); info.isFile())
         { return entity_data_manager::data_source(m_database.tags(sz::entity_database_query{.string = short_text.toStdString()})); }
@@ -651,89 +647,16 @@ namespace rin
     }
 
     
-    inline reflexive_entity entity_data_manager::m_make_item(const QString& parent_id, const QString& id, const QFileInfo& fsinfo, sz::entity_type type, bool is_indexed, bool fill_extended_attributes)
+    inline reflexive_entity entity_data_manager::m_make_entity(const QString& parent_id, const QString& id, std::optional<QFileInfo> fsinfo)
     {
-        using enum entity_attribute_type;
-        const bool is_file = type == sz::entity_type::File;
-
-        // TODO: standardized ids for files
-        // TODO: tag entities have children if additional tags occur within their inset
-        reflexive_entity item(is_file ? fsinfo.fileName() : id, type, is_indexed);
-        item.set_attribute(Parent_Id, parent_id);
-        if (is_file)
-        {
-            item.set_has_children(fsinfo.isDir());
-            item.set_attribute(File_Info, fsinfo);
-        }
-        if (sz::supported_extensions().contains(fsinfo.suffix().toLower().toStdString()))
-        {
-            item.set_attribute(Sizehint, QImageReader(fsinfo.absoluteFilePath()).size());
-        }
-        if (fill_extended_attributes)
-        {
-            m_fill_extended_item_attributes(item, id, is_file, is_indexed);
-        }
-        return item;
+        auto e = reflexive_entity::from_uri_or_id(id, &m_database, fsinfo);
+        e.set_attribute(Parent_Id, parent_id);
+        return e;
     }
 
-    inline void entity_data_manager::m_fill_extended_item_attributes(reflexive_entity& e, const QString& id, bool is_file, bool is_indexed)
+    inline void entity_data_manager::m_fill_extended_item_attributes(reflexive_entity& e)
     {
-        using enum entity_attribute_type;
-        if (is_file)
-        {
-            const auto fsinfo = e.attribute<QFileInfo>();
-            const auto mime = m_mimedb.mimeTypeForFile(fsinfo, QMimeDatabase::MatchExtension);
-            e.set_attribute(Mime_Type, mime);
-            e.set_attribute(Modified_Int, fsinfo.lastModified().toSecsSinceEpoch());
-            e.set_attribute(Modified, fsinfo.lastModified().toString());
-            e.set_attribute(Created_Int, fsinfo.birthTime().toSecsSinceEpoch());
-            e.set_attribute(Created, fsinfo.birthTime().toString());
-            e.set_attribute(Accessed_Int, fsinfo.lastRead().toSecsSinceEpoch());
-            e.set_attribute(Accessed, fsinfo.lastRead().toString());
-            e.set_attribute(File_Type, mime.comment().isEmpty() ? mime.name() : mime.comment());
-
-            if (fsinfo.isFile())
-            {
-                e.set_attribute(Size_Int, fsinfo.size());
-                e.set_attribute(Size, QLocale::system().formattedDataSize(fsinfo.size()));
-            }
-            else
-            {
-                const auto size = static_cast<qint64>(m_query_size(id));
-                e.set_attribute(Size_Int, size);
-                e.set_attribute(Size, QLocale::system().toString(size) + " " + tr("items"));
-            }
-        }
-        if (is_indexed)
-        {
-            const std::string id_ = id.toStdString();
-            const auto dbinfo = m_database.entity_info(id_);
-            e.set_attribute(Description, QString::fromStdString(dbinfo.description));
-            e.set_attribute(Color, dbinfo.rgba);
-
-            if (is_file)
-            {
-                sz::sqlite::database_query tags = m_database.tags(sz::entity_database_query{
-                    .string = id_
-                });
-                tag_set tagset;
-                for (std::string_view tag : tags)
-                {
-                    tagset.emplace(QString::fromUtf8(tag.data(), static_cast<qsizetype>(tag.size())));
-                }
-                e.set_attribute(Tags, std::move(tagset));
-            }
-            else
-            {
-                const auto ct = static_cast<qint64>(dbinfo.createtime);
-                const auto mt = static_cast<qint64>(dbinfo.modtime);
-                e.set_attribute(Created, QDateTime::fromSecsSinceEpoch(ct).toString());
-                e.set_attribute(Created_Int, ct);
-                e.set_attribute(Modified, QDateTime::fromSecsSinceEpoch(mt).toString());
-                e.set_attribute(Modified_Int, mt);
-                e.set_attribute(File_Type, e.type() == sz::entity_type::Tag ? "tag" : "concept");
-            }
-        }
+        e.fill_extended_attributes(m_database, m_mimedb, false);
     }
 
     // returns true if iteration over the source has completed or m_batchsize items were retrieved (m_batchsize >= query size)
@@ -771,9 +694,9 @@ namespace rin
         
         switch (source.type())
         {
-        case Filesystem: { m_iterate_source(std::get<filesystem_source>(source), node); break; }
-        case Indexed: { m_iterate_source(std::get<database_source>(source), node); break; }
-        case Concept: { m_iterate_source(std::get<concept_source>(source), node); break; }
+        case Filesystem: { m_iterate_source<filesystem_source>(source, node); break; }
+        case Indexed:    { m_iterate_source<database_source>(source, node); break; }
+        case Concept:    { m_iterate_source<concept_source>(source, node); break; }
         default:
         {
             qDebug() << "entity_data_manager: unknown source type for node: " << node.descriptor.full_text();
@@ -784,7 +707,7 @@ namespace rin
         if (m_do_interrupt.test())
         { return false; }
         
-        bool done = node.descriptor.processed >= node.descriptor.size || (source.at_end());
+        bool done = node.descriptor.processed >= node.descriptor.size || (!source.has_data());
         node.descriptor.status = done ? Completed : In_Progress;
         
         if (done)
@@ -835,12 +758,8 @@ namespace rin
             { break; }
 
             reflexive_entity& e = node[position];
+            m_fill_extended_item_attributes(e);
 
-            const QString id = e.type() == sz::entity_type::File ? e.attribute<QFileInfo>().absoluteFilePath() : e.attribute<QString>(Name);
-            const bool is_file = e.type() == sz::entity_type::File;
-            const bool is_indexed = m_database.entity_exists(id.toStdString());
-
-            m_fill_extended_item_attributes(e, id, is_file, is_indexed);
             ++items_processed;
             ++node.descriptor.processed_extended;
 
@@ -1193,7 +1112,7 @@ namespace rin
             }
 
             const QFileInfo info(new_id);
-            e = m_make_item(info.absoluteDir().path(), new_id, info, sz::entity_type::File, is_indexed, true);
+            e = m_make_entity(info.absoluteDir().path(), new_id, info);
         }
         return e;
     }
@@ -1212,7 +1131,7 @@ namespace rin
             }
 
             const QFileInfo info(dst_id);
-            e = m_make_item(info.absoluteDir().path(), dst_id, info, sz::entity_type::File, is_indexed, true);
+            e = m_make_entity(info.absoluteDir().path(), dst_id, info);
         }
         return e;
     }
@@ -1230,7 +1149,7 @@ namespace rin
             const QFileInfo info(target);
             
             // should entity type be File for symlinks?
-            e = m_make_item(info.absoluteDir().path(), target, info, sz::entity_type::File, is_indexed, true);
+            e = m_make_entity(info.absoluteDir().path(), target, info);
         }
         return e;
     }

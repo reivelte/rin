@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include <suzuri/utility/string.hpp>
-#include "common.hpp"
 #include "tree.hpp"
 #include "entity.hpp"
+#include "common.hpp"
 
 namespace rin
 {
