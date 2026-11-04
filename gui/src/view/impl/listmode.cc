@@ -288,8 +288,7 @@ namespace rin
 
     QSize entity_view::list_mode::content_size(const QSize& s) const
     {
-        // recalculate_content_width();
-        // recalculate_content_height();
+        Q_UNUSED(s);
         return QSize(total_content_width, total_content_height);
     }
 

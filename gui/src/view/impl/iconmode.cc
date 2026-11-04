@@ -211,13 +211,11 @@ namespace rin
         if (layout_mode == Row_Column)
         {
             const int num_cols = std::max(s.width() / (item_max_width + item_min_spacing_x), 1);
-            const int num_rows = row_count_for_item_count(count, num_cols);
-
             int max_h_for_row = 0;
             for (int i = 0; i < count; ++i)
             {
                 const int item_height = item_sizes_initialized ? items[i].height() : item_size_from_model(root_index, 0, i).height();
-                max_h_for_row = std::max(max_h_for_row, items[i].height());
+                max_h_for_row = std::max(max_h_for_row, item_height);
                 if (i % num_cols == num_cols - 1)
                 {
                     h += max_h_for_row + item_min_spacing_y;
@@ -317,7 +315,7 @@ namespace rin
     inline int entity_view::icon_mode::layout_linear_wrap(const QRect& r, bool write_layout_data)
     {
         const int start = 0;
-        const int end = items.size();
+        const int end = static_cast<int>(items.size());
         const int min_row_x = item_min_spacing_x + item_interior_spacing_x;
         const int min_x_inc = item_interior_spacing_x;
         const int min_y_inc = item_min_spacing_y + item_interior_spacing_y;
