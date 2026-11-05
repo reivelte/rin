@@ -336,11 +336,11 @@ namespace rin
         int start = node.size();
         // timer.start();
 
-        data_source_container<Source>& src = std::get<data_source_container<Source>>(x);
+        auto& src = std::get<data_source_container<Source>>(x);
         while (src.has_data())
         {
             std::optional<QFileInfo> info = std::nullopt;
-            if (x.type() == Filesystem)
+            if constexpr (std::same_as<Source, filesystem_source>)
             {
                 filesystem_source& raw = x;
                 info = raw.it->fileInfo();
