@@ -649,7 +649,7 @@ namespace rin
     
     inline reflexive_entity entity_data_manager::m_make_entity(const QString& parent_id, const QString& id, std::optional<QFileInfo> fsinfo)
     {
-        auto e = reflexive_entity::from_uri_or_id(id, &m_database, fsinfo);
+        auto e = reflexive_entity::from_uri_or_id(id, nullptr, fsinfo);
         e.set_attribute(Parent_Id, parent_id);
         return e;
     }

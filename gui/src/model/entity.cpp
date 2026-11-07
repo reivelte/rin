@@ -122,7 +122,7 @@ namespace rin
             if (const auto info = db.entity_info(id.toStdString()); info.id.size())
             {
                 // TODO: look at extra values supplied based on entity type
-                
+                set_indexed(true);
                 set_attribute(Description, QString::fromStdString(info.description));
                 set_attribute(Color, info.rgba);
 
