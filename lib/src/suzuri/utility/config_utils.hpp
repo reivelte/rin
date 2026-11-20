@@ -6,14 +6,10 @@
 #include <string>
 #include <string_view>
 #include <filesystem>
-#include <tuple>
-#include <utility>
-#include <type_traits>
-#include <variant>
 #include <toml.hpp>
 #include <sz_export.hpp>
 #include "../result.hpp"
-#include "../basic_vectors.hpp"
+#include "visitor.hpp"
 #include "string.hpp"
 
 namespace sz
@@ -32,45 +28,6 @@ namespace sz
     SZ_API std::filesystem::path get_xdg_directory(data_directory_type type);
     SZ_API std::filesystem::path get_config_path(config_type type);
     SZ_API bool is_valid_domain(const std::filesystem::path& path);
-
-    namespace detail
-    {
-        // referenced from: https://www.youtube.com/watch?v=EsUmnLgz8QY
-        template <typename... Base>
-        struct basic_visitor : Base...
-        {
-            using Base::operator()...;
-        };
-        template <typename... T> basic_visitor(T...) -> basic_visitor<T...>;
-
-        template <typename... Funcs, typename... Types>
-        inline void type_conditional_call(detail::basic_visitor<Funcs...> visitor, Types&&... values)
-        {
-            using Tuple_Of_Types = decltype(std::tuple<std::remove_cvref_t<Types>...>());
-            using T = std::tuple_element_t<0, Tuple_Of_Types>;
-            using Ts = typename std::decay_t<decltype((std::forward<Types>(values), ...))>;
-            constexpr std::size_t N = sizeof...(Types);
-
-            constexpr bool all_same_type = [&] <std::size_t... Idx> (std::index_sequence<Idx...>) constexpr -> bool
-            {
-                return ((std::same_as<T, std::tuple_element_t<Idx, Tuple_Of_Types>>) && ...);
-            }(std::index_sequence_for<Types...>{});
-
-            if constexpr (N > 1 && all_same_type)
-            {
-                std::vector<T> x{values...};
-                std::variant<std::vector<T>> v;
-                v = x;
-                std::visit(visitor, v);
-            }
-            else
-            {
-                const std::array<std::variant<Ts>, sizeof...(Types)> x{std::variant<Ts>(values)...};
-                for (const auto& v : x)
-                { std::visit(visitor, v); }
-            }
-        }
-    }
 
     class SZ_API toml_config
     {
@@ -128,7 +85,7 @@ namespace sz
         
         #define data_append(DATA, VECTOR) toml::ordered_value& arr = m_data_for_keys(keys, DATA); for (const auto& x : VECTOR) { arr.push_back(x); }
 
-        detail::basic_visitor visitor{
+        utility::basic_visitor visitor{
             [&](const std::vector<int>& v) ->           void { data_append(data, v); },
             [&](const std::vector<double>& v) ->        void { data_append(data, v); },
             [&](const std::vector<std::string>& v) ->   void { data_append(data, v); },
@@ -140,7 +97,7 @@ namespace sz
         
         #undef data_append
 
-        detail::type_conditional_call(visitor, std::forward<Types>(values)...);
+        utility::type_conditional_call(visitor, std::forward<Types>(values)...);
         m_write(data);
     }
 
@@ -170,7 +127,7 @@ namespace sz
             data = toml::parse<toml::ordered_type_config>(m_filepath);
         }
 
-        detail::basic_visitor visitor{
+        utility::basic_visitor visitor{
             [&](std::vector<std::string>& ret) -> void
             {
                 auto arr = m_data_for_keys(keys, data).as_array();
@@ -220,7 +177,7 @@ namespace sz
         {
             // TODO: use parameter pack indexing here after switching to C++26
             #define T(INDEX) std::tuple_element_t<INDEX, Tuple_Of_Types>
-            return detail::basic_visitor{
+            return utility::basic_visitor{
                 ([&](const T(Idx)& v) -> void
                 {
                     (void)v;
@@ -234,7 +191,7 @@ namespace sz
             };
             #undef T
         }(std::index_sequence_for<Types...>{});
-        detail::type_conditional_call(visitor, (std::remove_cvref_t<Types>())...);
+        utility::type_conditional_call(visitor, (std::remove_cvref_t<Types>())...);
     }
 
     template <typename T>

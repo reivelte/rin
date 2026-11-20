@@ -46,16 +46,22 @@ namespace sz
         common_error() = default;
 
         template <is_int_compatible T>
-        constexpr common_error(T code, std::string_view msg = "", std::source_location loc = std::source_location::current()) 
-        : m_error_code([&]
+        constexpr common_error(T code, std::string_view msg = "", std::source_location loc = std::source_location::current())  :
+            m_error_code([&] -> int
             {
                 if constexpr (std::is_enum_v<T>) 
                 { return std::to_underlying(code); }
                 else 
                 { return static_cast<int>(code); }
             }()),
-
-        m_error_type(std::string(type_name<T>()) + "::" + std::string(magic_enum::enum_name(code))), m_location(loc), m_msg(std::string(msg)) {}
+            m_error_type([&] -> std::string
+            {
+                if constexpr (std::is_enum_v<T>) {
+                    return std::string(type_name<T>()) + "::" + std::string(magic_enum::enum_name(code));
+                }
+                return std::string(type_name<T>());
+                
+            }()), m_location(loc), m_msg(std::string(msg)) {}
 
         explicit common_error(std::error_code&& err_code, std::source_location loc = std::source_location::current())
         : m_error_code(err_code.value()), 

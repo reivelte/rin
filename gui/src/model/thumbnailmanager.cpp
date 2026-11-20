@@ -205,7 +205,7 @@ namespace rin
 
     QString thumbnail_manager::m_thumbnail_cache_path(const thumbnail_descriptor& d) const
     {
-        return QString::fromStdString(sz::thumbnail_cache_path(sz::entity_uri(d.id.toStdString(), d.entity_type), d.target_size).string());
+        return QString::fromStdString(sz::thumbnail_cache_path(sz::entity_uri(d.text().toStdString(), d.entity_type), d.target_size).string());
     }
 
     QSize thumbnail_manager::m_thumbnail_size(const thumbnail_descriptor& d) const
@@ -218,7 +218,7 @@ namespace rin
     {
         using enum sz::entity_type;
         
-        const std::string id = d.id.toStdString();
+        const std::string id = d.text().toStdString();
         QPixmap thumb;
         
         if (d.entity_type == File)
@@ -244,7 +244,7 @@ namespace rin
         {
             if (const auto keys = image.textKeys(); keys.contains("Thumb::MTime"))
             {
-                const QString& id = d.id;
+                const QString& id = d.text();
                 const qint64 recorded_mtime = image.text("Thumb::MTime").toLongLong();
                 if (d.entity_type == File && keys.contains("Thumb::Size"))
                 {
@@ -267,7 +267,8 @@ namespace rin
         static constexpr const std::string_view software = "rin";
 
         // TODO: eventually we will need to check a platform-specific id (paths formatted for the current platform)
-        if (d.id.startsWith(QString::fromStdString(sz::thumbnail_cache_path().string())))
+        const QString id = d.text();
+        if (id.startsWith(QString::fromStdString(sz::thumbnail_cache_path().string())))
         { return false; }
 
         QImage image = d.thumbnail.toImage();
@@ -275,13 +276,13 @@ namespace rin
         qint64 fsize = 0;
         QString description;
         
-        const std::string eid = d.id.toStdString();
+        const std::string eid = id.toStdString();
         const auto info = m_db.entity_info(eid);
         const bool is_indexed = !info.id.empty();
         
         if (d.entity_type == sz::entity_type::File)
         {
-            QFileInfo finfo(d.id);
+            QFileInfo finfo(id);
             mtime = finfo.lastModified().toSecsSinceEpoch();
             fsize = finfo.size();
         }
@@ -317,7 +318,9 @@ namespace rin
             if (m_do_interrupt.test())
             { break; }
             
-            if (m_is_supported_entity(QString::fromStdString(sz::entity_uri(d.id.toStdString(), d.entity_type))))
+            const QString id = d.text();
+            
+            if (m_is_supported_entity(QString::fromStdString(sz::entity_uri(id.toStdString(), d.entity_type))))
             {
                 if (const QString thumbnail_path = m_thumbnail_cache_path(d); m_thumbnail_is_up_to_date(d, thumbnail_path))
                 {

@@ -32,6 +32,7 @@ namespace rin
     class navigation_panel;
     class icon_sizer;
     class domain_dialog;
+    class querybox;
     class main_window : public QMainWindow
     {
         Q_OBJECT
@@ -39,6 +40,9 @@ namespace rin
         public:
         main_window(QWidget* parent = nullptr);
         ~main_window();
+
+        signals:
+        void moved(QPoint old_position, QPoint new_position);
 
         public slots:
         // ###################################################### TODO: specific to a window tab ######
@@ -82,7 +86,8 @@ namespace rin
         void select_item(const QModelIndex& index);
 
         protected:
-        void contextMenuEvent(QContextMenuEvent* e) override;
+        void contextMenuEvent(QContextMenuEvent* event) override;
+        void moveEvent(QMoveEvent* event) override;
 
         private:
         enum class window_menu_type : int { File, Edit, Help };
@@ -106,7 +111,7 @@ namespace rin
         void m_set_view_item_alignment(const std::string& value);
         void m_set_viewmode(entity_view_mode mode);
         QString m_make_view_stats_status_message(uintmax_t size, size_t dir_count, size_t file_count, size_t tag_count);
-        void m_update_view_stats(const entity_model::item_properties& props);
+        // void m_update_view_stats(const entity_model::item_properties& props);
         void m_create_menubar();
 
         private:
@@ -136,7 +141,7 @@ namespace rin
         QToolButton* m_listmode_toggle;
         QToolBar* m_location_bar;
         icon_sizer* m_icon_sizer;
-        QLineEdit* m_lineedit;
+        querybox* m_querybox;
         entity_view* m_view;
         tag_view* m_tag_view;
         entity_model* m_model; // TODO: proxy models

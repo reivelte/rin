@@ -19,6 +19,7 @@ set(SOURCES #!BEGIN: SOURCE LIST
   src/tagger/tag_panel.cpp
   src/model/entity.cpp
   src/model/common.cpp
+  src/model/descriptor.cpp
   src/model/thumbnailmanager.cpp
   src/model/entitymodel.cpp
   src/model/tree.cpp
@@ -30,6 +31,7 @@ set(SOURCES #!BEGIN: SOURCE LIST
   src/widgets/navigationpanel.cpp
   src/widgets/iconsizer.cpp
   src/widgets/resizing_textedit.cpp
+  src/widgets/querybox.cpp
   src/widgets/details_panel.cpp
   src/widgets/panel.cpp
   src/widgets/image.cpp
@@ -51,8 +53,10 @@ set(SOURCES #!BEGIN: SOURCE LIST
   src/tagger/tag_panel.hpp
   src/model/common.hpp
   src/model/entity.hpp
+  src/model/descriptor.hpp
   src/model/thumbnailmanager.hpp
   src/model/historymanager.hpp
+  src/model/data_source.hpp
   src/model/datamanager.hpp
   src/model/entitymodel.hpp
   src/model/tree.hpp
@@ -63,6 +67,7 @@ set(SOURCES #!BEGIN: SOURCE LIST
   src/widgets/resizing_textedit.hpp
   src/widgets/navigationpanel.hpp
   src/widgets/panel.hpp
+  src/widgets/querybox.hpp
   src/widgets/details_panel.hpp
   src/widgets/image.hpp
   src/widgets/tag_view/tag_view.hpp

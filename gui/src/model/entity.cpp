@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0-only
 
+#include <QtCore/QMimeType>
+#include <QtGui/QIcon>
 #include <QtGui/QImageReader>
 #include "entity.hpp"
 
@@ -77,6 +79,7 @@ namespace rin
     // expects the Id attribute to already be set
     void reflexive_entity::fill_extended_attributes(sz::entity_database& db, const QMimeDatabase& mimedb, bool get_tag_set)
     {
+        Q_UNUSED(get_tag_set);
         using enum sz::entity_type;
         const auto& id = attribute<QString>(Id);
         const auto t = type();
@@ -126,14 +129,14 @@ namespace rin
                 set_attribute(Description, QString::fromStdString(info.description));
                 set_attribute(Color, info.rgba);
 
-                if (get_tag_set && (t == File))
-                {
-                    sz::sqlite::database_query tags = db.tags(sz::entity_database_query{ .string = info.id });
-                    auto& set = attribute<tag_set>();
+                // if (get_tag_set && (t == File))
+                // {
+                //     sz::sqlite::database_query tags = db.tags(sz::entity_database_query{ .string = info.id });
+                //     auto& set = attribute<tag_set>();
                     
-                    for (const std::string_view tag : tags)
-                    { set.insert(QString::fromUtf8(tag.data(), static_cast<qsizetype>(tag.size()))); }
-                }
+                //     for (const std::string_view tag : tags)
+                //     { set.insert(QString::fromUtf8(tag.data(), static_cast<qsizetype>(tag.size()))); }
+                // }
 
                 if ((t != File) || !file_exists)
                 {

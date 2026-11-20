@@ -23,7 +23,7 @@ namespace rin
         // get an empty concept for use with this view
             // FIXME: this causes a job interruption in dataman unnecessarily
             // ideally dataman doesn't need to be involved when the list of urls passed to query() is empty
-        m_index_for_view_concept = m_model->query(m_view_url, QList<QUrl>());
+        // m_index_for_view_concept = m_model->query(m_view_url, QList<QUrl>());
         setRootIndex(m_index_for_view_concept);
     }
 
@@ -108,7 +108,7 @@ namespace rin
 
     inline void tag_view::m_default_populate()
     {
-        setRootIndex(m_model->query("!taglist:", false));
+        setRootIndex(m_model->query("concept://!taglist:", false));
     }
 
     inline void tag_view::m_setup_oneline_mode()

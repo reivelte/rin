@@ -4,11 +4,9 @@
 
 #pragma once
 
+#include <string>
+
 namespace sz
 {
-    struct vector2
-    {
-        int x{};
-        int y{};
-    };
+    typedef std::string string;
 } // namespace sz

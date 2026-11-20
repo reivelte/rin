@@ -9,28 +9,6 @@
 
 namespace rin
 {
-    void query_descriptor::adjust(const reflexive_entity& e, bool increment)
-    {
-        using enum entity_attribute_type;
-        using enum sz::entity_type;
-        const int adj = increment ? 1 : -1;
-        if (e.type() == File)
-        {
-            if (const auto& fsinfo = e.attribute<QFileInfo>(File_Info); fsinfo.isDir())
-            { dir_count += adj; }
-            else
-            {
-                file_count += adj;
-                if (increment)
-                { filesize += static_cast<uintmax_t>(fsinfo.size()); }
-                else
-                { filesize -= static_cast<uintmax_t>(fsinfo.size()); }
-            }
-        }
-        else if (e.type() == Tag || e.type() == Alias)
-        { tag_count += adj; }
-    }
-
     void sort_entities(entity_tree_node& node)
     {
         using enum entity_attribute_type;
@@ -41,10 +19,13 @@ namespace rin
             {Created, Created_Int},
             {Modified, Modified_Int}
         };
-        
-        assert(node.descriptor.sort_key && node.descriptor.sort_order);
-        auto sort_key = *node.descriptor.sort_key;
-        const bool ascending = *node.descriptor.sort_order == Qt::SortOrder::AscendingOrder;
+
+        auto sort_info = node.const_descriptor().sort_info();
+        if (!sort_info) {
+            return;
+        }
+        auto [sort_order, sort_key] = *sort_info;
+        const bool ascending = sort_order == Qt::SortOrder::AscendingOrder;
 
         auto cmp = [&](const QString& name_a, const QString& name_b) -> bool // return true if a should occur before b
         {

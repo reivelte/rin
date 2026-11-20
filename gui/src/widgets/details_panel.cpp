@@ -132,7 +132,7 @@ namespace rin
                 auto* attr_str_item = new QTableWidgetItem(attr_str);
                 attr_str_item->setTextAlignment(Qt::AlignmentFlag::AlignTop | Qt::AlignmentFlag::AlignRight);
 
-                auto* attr_value_item = new QTableWidgetItem(std::get<QString>(value));
+                auto* attr_value_item = new QTableWidgetItem(e.attribute<QString>(attr));
                 attr_value_item->setTextAlignment(Qt::AlignmentFlag::AlignTop);
 
                 m_info_table->setItem(row, 0, attr_str_item);

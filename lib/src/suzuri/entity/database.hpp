@@ -58,7 +58,9 @@ namespace sz
     struct entity_database_query
     {
         std::string string{};
+        bool get_similar = false;
 
+        inline operator std::string_view() const noexcept { return string; }
         inline operator const std::string&() const noexcept { return string; }
     };
 

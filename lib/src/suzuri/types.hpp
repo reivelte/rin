@@ -9,9 +9,36 @@
 #include <expected>
 #include <string_view>
 #include <vector>
+#include <cstdint>
 
 namespace sz 
 {
+    namespace primitive_types
+    {
+        typedef int64_t  i64;
+        typedef int32_t  i32;
+        typedef int16_t  i16;
+        typedef int8_t   i8;
+        typedef uint64_t u64;
+        typedef uint32_t u32;
+        typedef uint16_t u16;
+        typedef uint8_t  u8;
+        
+        typedef i64 isize;
+        typedef u64 usize;
+    }
+
+    using primitive_types::i64;
+    using primitive_types::i32;
+    using primitive_types::i16;
+    using primitive_types::i8;
+    using primitive_types::u64;
+    using primitive_types::u32;
+    using primitive_types::u16;
+    using primitive_types::u8;
+    using primitive_types::isize;
+    using primitive_types::usize;
+
     template <typename T>
     concept is_result = requires(T t) 
     {
@@ -36,10 +63,20 @@ namespace sz
         requires std::same_as<std::decay_t<T>, std::vector<typename std::decay_t<T>::value_type>>;
     };
 
-    template <typename Func, typename... Args>
-    concept is_indicating_function = requires 
+    template <typename Func, typename Ret, typename... Args>
+    concept is_function_of = requires
     {
-        requires std::invocable<Func, Args...> && std::same_as<std::invoke_result_t<Func, Args...>, bool>;
+        requires std::invocable<Func, Args...> && std::same_as<std::invoke_result_t<Func, Args...>, Ret>;
+    };
+
+    template <typename Func, typename... Args>
+    concept is_indicating_function = requires { requires is_function_of<Func, bool, Args...>; };
+
+    template <typename T, typename... Types>
+    concept is_any_of = requires
+    {
+        requires
+        (std::same_as<T, Types> || ...);
     };
 
     template <typename T>

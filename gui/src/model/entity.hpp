@@ -3,83 +3,25 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #pragma once
-#include <array>
-#include <concepts>
-#include <variant>
-#include <cstdint>
-#include <unordered_map>
+
 #include <unordered_set>
-#include <typeindex>
-#include <typeinfo>
-#include <QtCore/QString>
-#include <QtCore/QSize>
-#include <QtCore/QUrl>
-#include <QtCore/QDir>
-#include <QtCore/QFileInfo>
-#include <QtCore/QMimeType>
 #include <QtCore/QMimeDatabase>
-#include <QtGui/QIcon>
-#include <suzuri/entity/database.hpp>
-#include <suzuri/entity/common.hpp>
 #include "common.hpp"
 
 namespace rin
 {
     class entity_model;
+    class entity_tree;
+    class entity_tree_node;
+    class entity_data_manager;
 
     typedef std::unordered_set<QString> tag_set;
-    typedef std::variant<
-        tag_set,
-        QString, QSize, QFileInfo, QUrl,
-        QIcon, QMimeType,
-        qint64, int
-    >
-    entity_attribute_base;
-
-    template <typename T>
-    concept is_valid_entity_attribute_type = requires
+    
+    class reflexive_entity : public sz::entity
     {
-        requires 
-        (std::same_as<T, QString> || std::convertible_to<T, QString>) ||
-        std::same_as<T, tag_set> ||
-        std::same_as<T, QSize> ||
-        std::same_as<T, QFileInfo> ||
-        std::same_as<T, QUrl> ||
-        std::same_as<T, QIcon> ||
-        std::same_as<T, QMimeType> ||
-        (std::same_as<T, int> || sz::is_int_compatible<T>);
-    };
-
-    namespace detail
-    {
-        using enum entity_attribute_type;
-        static const std::unordered_map<std::type_index, entity_attribute_type> s_default_attrs{
-            {typeid(QString), Name},
-            {typeid(tag_set), Tags},
-            {typeid(QSize), Sizehint},
-            {typeid(QFileInfo), File_Info},
-            {typeid(QUrl), Url},
-            {typeid(QIcon), Icon},
-            {typeid(QMimeType), Mime_Type}
-        };
-    }
-
-    class entity_attribute : public entity_attribute_base
-    {
-        using base = entity_attribute_base;
+        using base = sz::entity;
         using base::base;
 
-        public:
-        explicit entity_attribute(const char* text) : base(QString(text)) {}
-        explicit entity_attribute(const std::string& text) : base(QString::fromStdString(text)) {}
-    };
-
-    typedef std::unordered_map<entity_attribute_type, entity_attribute> entity_attribute_map;
-
-    #define ENT_ATTR_TMPL(X) template <is_valid_entity_attribute_type X>
-    
-    class reflexive_entity
-    {
         public:
         static reflexive_entity from_uri_or_id(QString x, sz::entity_database* db = nullptr, std::optional<QFileInfo> fsinfo = std::nullopt);
 
@@ -91,57 +33,40 @@ namespace rin
         inline bool operator==(const QString& rhs) const;
         inline bool operator!=(const QString& rhs) const;
 
+        protected:
         inline void set_key(int key);
         inline void set_parent_key(int parent);
-        inline void set_indexed(bool indexed);
-        inline void set_has_children(bool has_children);
-
-        ENT_ATTR_TMPL(T) void set_attribute(entity_attribute_type attr, const T& value);
-        ENT_ATTR_TMPL(T) const T& attribute(entity_attribute_type attr = entity_attribute_type::Null_Attribute) const;
-        ENT_ATTR_TMPL(T) T& attribute(entity_attribute_type attr = entity_attribute_type::Null_Attribute);
-
+        
         void fill_extended_attributes(sz::entity_database& db, const QMimeDatabase& mimedb, bool get_tag_set);
-
-        inline const entity_attribute_map& attribute_map() const;
 
         inline int key() const;
         inline int parent_key() const;
-        
-        inline bool has_attribute(entity_attribute_type attribute) const;
-        inline bool has_children() const;
-        inline bool is_indexed() const;
-        inline bool valid() const;
-        inline sz::entity_type type() const noexcept;
-
-        protected:
-        inline void set_type(sz::entity_type type);
 
         private:
         using enum entity_attribute_type;
         friend class entity_model;
-        entity_attribute_map m_attributes;
-        sz::entity_type m_type;
+        friend class entity_tree;
+        friend class entity_tree_node;
+        friend class entity_data_manager;
+
         int m_parent;
         int m_self;
-        bool m_is_indexed;
-        bool m_has_children;
-
     };
 
     inline reflexive_entity::reflexive_entity() :
-        m_attributes(), 
-        m_type(sz::entity_type::Invalid), m_parent(0), m_self(0),
-        m_is_indexed(false), m_has_children(false)
+        base()
     {
-        set_attribute(Name, "");
+        set_attribute(Name, QString());
     }
 
     inline reflexive_entity::reflexive_entity(const QString& name, sz::entity_type type, bool is_indexed, bool has_children) :
-        m_attributes(),
-        m_type(type), m_parent(0), m_self(0),
-        m_is_indexed(is_indexed), m_has_children(has_children)
+        base()
     {
+        erase_attribute(Name);
         set_attribute(Name, name);
+        set_type(type);
+        set_indexed(is_indexed);
+        set_has_children(has_children);
     }
 
     inline bool reflexive_entity::operator==(const reflexive_entity& rhs) const
@@ -169,54 +94,6 @@ namespace rin
         m_parent = parent;
     }
 
-    inline void reflexive_entity::set_indexed(bool indexed)
-    {
-        m_is_indexed = indexed;
-    }
-
-    inline void reflexive_entity::set_has_children(bool has_children)
-    {
-        m_has_children = has_children;
-    }
-
-    ENT_ATTR_TMPL(T) inline void reflexive_entity::set_attribute(entity_attribute_type attr, const T& value)
-    {
-        if (attr == Null_Attribute)
-        { return; }
-        
-        m_attributes.emplace(attr, value);
-    }
-
-    ENT_ATTR_TMPL(T) inline const T& reflexive_entity::attribute(entity_attribute_type attr) const
-    {
-        // FIXME: non-const attribute() uses operator[] on the map, which breaks const-correctness
-        return std::as_const(const_cast<reflexive_entity*>(this)->attribute<T>(attr));
-    }
-
-    ENT_ATTR_TMPL(T) inline T& reflexive_entity::attribute(entity_attribute_type attr)
-    {
-        auto t = Null_Attribute;
-        if (attr == Null_Attribute)
-        {
-            // get the default attribute based on the type id
-            if (std::type_index idx(typeid(T)); detail::s_default_attrs.contains(idx))
-            { t = detail::s_default_attrs.at(idx); }
-            else
-            { throw sz::exception(sz::result_code::Invalid_Argument); }
-        }
-        else
-        { t = attr; }
-
-        entity_attribute& a = m_attributes[t];
-        assert(std::holds_alternative<T>(a));
-        return std::get<T>(a);
-    }
-
-    inline const entity_attribute_map& reflexive_entity::attribute_map() const
-    {
-        return m_attributes;
-    }
-
     inline int reflexive_entity::key() const
     {
         return m_self;
@@ -225,36 +102,6 @@ namespace rin
     inline int reflexive_entity::parent_key() const
     {
         return m_parent;
-    }
-
-    inline bool reflexive_entity::has_attribute(entity_attribute_type attribute) const
-    {
-        return m_attributes.contains(attribute);
-    }
-
-    inline bool reflexive_entity::has_children() const
-    {
-        return m_has_children;
-    }
-
-    inline bool reflexive_entity::is_indexed() const
-    {
-        return m_is_indexed;
-    }
-
-    inline bool reflexive_entity::valid() const
-    {
-        return attribute<QString>(Name).size() && (m_type != sz::entity_type::Invalid);
-    }
-
-    inline sz::entity_type reflexive_entity::type() const noexcept
-    {
-        return m_type;
-    }
-
-    inline void reflexive_entity::set_type(sz::entity_type type)
-    {
-        m_type = type;
     }
 
 } // namespace rin

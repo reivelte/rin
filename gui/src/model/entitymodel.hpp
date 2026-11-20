@@ -31,64 +31,32 @@ namespace rin
     {
         Q_OBJECT
 
-        public:
-        struct item_properties
-        {
-            QString identifier;
-            uintmax_t size;
-            size_t dir_count;
-            size_t file_count;
-            size_t tag_count;
-
-            item_properties() :
-                identifier(), 
-                size(0), dir_count(0), file_count(0), tag_count(0)
-            {}
-
-            item_properties(const query_descriptor& qd) :
-                identifier(qd.full_text()),
-                size(qd.filesize), dir_count(qd.dir_count), file_count(qd.file_count), tag_count(qd.tag_count)
-            {}
-
-            constexpr item_properties& operator+=(const item_properties& rhs) noexcept
-            {
-                size += rhs.size;
-                dir_count += rhs.dir_count;
-                file_count += rhs.file_count;
-                tag_count += rhs.tag_count;
-                return *this;
-            }
-        };
-
-        public:
-        entity_model(QObject* parent, const std::filesystem::path& database_path);
+        public: // constructors/operators
+        entity_model(const std::filesystem::path& database_path, QObject* parent);
         ~entity_model();
 
-        void set_batchsize(size_t size);
+        public: // setters
+        void set_batchsize(usize size);
         void set_readonly(bool readonly);
         void set_database(const std::filesystem::path& path);
         void set_display_attributes(const std::vector<entity_attribute_type>& attrs);
         void set_display_attribute_string(entity_attribute_type attr, QString str);
+        void set_watched(const QModelIndex& index, bool watched);
         
-        QModelIndex query(const QString& text, bool replace_root = true);
-        QModelIndex query(const QString& text, const QList<QUrl>& urls);
-
+        public: // mutators
+        QModelIndex query(QString text, bool replace_root = true);
+        void sort(const QModelIndex& parent, int column, Qt::SortOrder order);
         void tag(const QModelIndex& index, const std::vector<reflexive_entity>& tag_entities);
         void tag(const QModelIndex& index, const sz::metadata::parameters& args);
         void tag(const QString& entity_id, const sz::metadata::parameters& args);
-
         void append_data(const QModelIndex& parent, const std::vector<reflexive_entity>& data);
-        
-        void watch(const QModelIndex& index);
-        void unwatch(const QModelIndex& index);
-        
         bool remove(const QModelIndex& index, bool recycle = true);
         void clear(const QModelIndex& parent);
-        
         void clear_thumbnails();
         void request_thumbnails(const QList<QModelIndex>& indexes, sz::thumbnail_target_size size);
 
-        bool valid_index(const QModelIndex& index);
+        public: // getters
+        bool valid_index(const QModelIndex& index) const;
         bool extended_information_loaded(const QModelIndex& index) const;
         QPixmap thumbnail(const reflexive_entity& e, sz::thumbnail_target_size size) const;
         QPixmap thumbnail(const reflexive_entity& e) const;
@@ -97,34 +65,37 @@ namespace rin
         bool has_thumbnail_loaded(const QModelIndex& index, sz::thumbnail_target_size size) const;
         bool has_thumbnail_loaded(const QModelIndex& index) const;
         QModelIndex root_index() const;
-        QModelIndex index(const QString& query_text);
-        QString root_query() const;
+        QModelIndex index(const QString& uri);
+        QString root_uri() const;
         QString id_for_index(const QModelIndex& index) const;
         const reflexive_entity& at(const QModelIndex& index);
-        item_properties properties(const QModelIndex& parent) const;
         bool entity_exists(const std::string& entity_id) const;
         reflexive_entity entity_from_id(const std::string& id) const;
 
-        // reimplemented functions
+        public: // reimplemented setters
+        bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
+        bool setHeaderData(int section, Qt::Orientation orientation, const QVariant& value, int role = Qt::EditRole) override;
+
+        public: // reimplemented mutators
+        bool dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent) override;
+        void fetchMore(const QModelIndex& parent) override;
+        void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) override;
+
+        public: // reimplemented getters
         QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
         QModelIndex parent(const QModelIndex& child) const override;
         int rowCount(const QModelIndex& parent = QModelIndex()) const override;
         int columnCount(const QModelIndex& parent = QModelIndex()) const override;
         bool hasChildren(const QModelIndex& parent = QModelIndex()) const override;
         QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
-        bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole) override;
         QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
-        bool setHeaderData(int section, Qt::Orientation orientation, const QVariant& value, int role = Qt::EditRole) override;
         QStringList mimeTypes() const override;
         QMimeData* mimeData(const QModelIndexList& indexes) const override;
         bool canDropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent) const override;
-        bool dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent) override;
         Qt::DropActions supportedDropActions() const override;
         Qt::DropActions supportedDragActions() const override;
-        void fetchMore(const QModelIndex& parent) override;
         bool canFetchMore(const QModelIndex& parent) const override;
         Qt::ItemFlags flags(const QModelIndex& index) const override;
-        void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) override;
         QModelIndex buddy(const QModelIndex& index) const override;
         QModelIndexList match(const QModelIndex& start, int role, const QVariant& value, int hits = 1, Qt::MatchFlags flags = Qt::MatchFlags(Qt::MatchStartsWith|Qt::MatchWrap)) const override;
         QSize span(const QModelIndex& index) const override;
@@ -137,90 +108,77 @@ namespace rin
         void query_done(const QString& query_string);
         void sort_starting();
         void sort_finished();
-        void fetch_failed(const QString& target_path, const std::vector<entity_model_url>& urls, fetch_action action);
         void thumbnail_available(const reflexive_entity& e, sz::thumbnail_target_size size);
         
         public slots:
         void set_thumbnail_target_size(sz::thumbnail_target_size size);
         void set_sort_preference(int column, Qt::SortOrder order);
 
-        protected:
-        // reimplemented functions
-        void timerEvent(QTimerEvent* e) override;
-
         protected slots:
-        void insert(const entity_tree_node& updated_node, int start, int end);
-        void insert(const query_descriptor& qd, const std::vector<reflexive_entity>& data);
-        void remove(const query_descriptor& qd, const std::vector<std::tuple<QString, int>>& to_remove);
-        void clear(int key, bool emit_signals);
-        void invalidate(const QString& query_text);
-        void invalidate(const QString& query_text, const QList<QUrl>& urls);
-        void update(const query_descriptor& qd, std::vector<reflexive_entity> data);
-        void update(const entity_tree_node& updated_node, int start, int end);
-        void copy(const entity_tree_node& updated_node, const std::vector<node_index_change>& updated_key_indexes = {});
-        void set_thumbnail(const thumbnail_descriptor& data);
-        void finalize_query(query_descriptor qd);
-        void handle_query_progress(query_descriptor qd, QList<std::tuple<QString, int>> processed);
-        void handle_query_failure(query_descriptor qd, QList<std::tuple<QString, QString>> failed);
-        void handle_fetch_progress(fetch_descriptor fd, std::vector<entity_model_url> urls_processed);
-        void handle_fetch_failure(fetch_descriptor fd, std::vector<entity_model_url> urls);
+        void insert(data_node_update update);
+        void invalidate(data_node_key k);
+        void set_thumbnail(const thumbnail_descriptor& d);
+
+        protected: // reimplemented functions
+        void timerEvent(QTimerEvent* e) override;
 
         protected:
         friend class entity_view;
+        friend class entity_data_manager;
 
         struct item_temp_data
         {
             QString old_name;
             int index;
-            fetch_action action;
+            concept_descriptor::parameters::action action;
         };
 
         protected:
         sz::result<entity_tree_node_state> node_state(const QModelIndex& parent) const;
+        QModelIndex create_index(const reflexive_entity& e, int idx) const;
 
         private:
-        template <typename T> requires std::same_as<T, entity_tree_node> || std::same_as<T, std::vector<reflexive_entity>>
-        inline void m_insert_entities(const QModelIndex& parent, int key, int start, int end, const T& data, bool copy_in);
-
+        inline void m_update_indexes(const data_node_layout_changes& changes);
         inline QIcon m_get_icon(const reflexive_entity& e);
         inline void m_refresh_entity(reflexive_entity& e);
-        inline void m_update_size_attribute_for_item_representing_node(int key);
-        inline int m_key_for_index(const QModelIndex& index) const;
+        inline void m_update_size_attribute_for_item_representing_node(data_node_key key);
+        inline data_node_key m_key_for_index(const QModelIndex& index) const;
         inline void m_clear();
-        inline void m_deactivate(int key);
-        inline void m_schedule_delayed_info_fetch(int key, int start_index);
-        inline void m_remove_delayed_info_fetch(int key = 0, int start_index = -1);
-        inline void m_schedule_delayed_sort(const int key, int delay);
-        inline void m_remove_delayed_sort(const int key = 0);
+        inline void m_deactivate(data_node_key key);
+        inline void m_schedule_delayed_info_fetch(data_node_key key, int start_index);
+        inline void m_remove_delayed_info_fetch(data_node_key key = 0, int start_index = -1);
+        inline void m_schedule_delayed_sort(data_node_key key, int delay);
+        inline void m_remove_delayed_sort(data_node_key key = 0);
         inline void m_interrupt_delayed_sort();
-        inline void m_schedule_delayed_query(const QString& query_string);
-        inline void m_remove_delayed_query(const QString& query_string = QString());
-        inline void m_do_invalidate(entity_tree_node& node);
-        inline void m_create_node(const QString& query_text, int parent_key, int index);
-        inline void m_create_node(const QString& query_text, const QList<QUrl>& urls, int parent_key, int index);
-        inline void m_remove_node(int key);
-        inline void m_remove_item(int parent_key, int index);
-        inline void m_purge_item(int parent_key, int item_key, int item_index);
+        inline void m_schedule_delayed_query(const QString& uri);
+        inline void m_remove_delayed_query(const QString& uri = QString());
+        inline void m_create_and_enqueue_node(const QString& uri, data_node_key parent_key, int index, std::optional<QList<QString>> uris = std::nullopt);
+        inline void m_remove_node(data_node_key key);
+        inline void m_remove_entity(data_node_key parent_key, int index);
+        inline void m_purge_entity_from_model(data_node_key parent_key, data_node_key entity_key, int entity_index);
         inline std::unordered_map<QString, QModelIndex> m_indexes(const entity_tree_node& node) const;
-        inline QModelIndex m_index_for_item(const reflexive_entity& item, int pos) const;
-        inline QModelIndex m_index_for_querytext(const QString& text) const;
-        inline const entity_tree_node& m_node_for_key(int key) const;
+        inline QModelIndex m_index_for_entity(const reflexive_entity& e, int node_index) const;
+        inline QModelIndex m_index_for_uri(const QString& uri) const;
+        inline entity_tree_node& m_node_for_key(data_node_key key);
+        inline const entity_tree_node& m_node_for_key(data_node_key key) const;
+        inline const entity_tree_node& m_node_for_uri(const QString& uri) const;
         inline const entity_tree_node& m_node_for_valid_index(const QModelIndex& index) const;
         inline const entity_tree_node& m_node_for_index(const QModelIndex& index) const;
-        inline QString m_id_for_key(int key) const;
-        inline QString m_absolute_path_for_file_entity(const QModelIndex& index) const; // TODO
+        inline QString m_uri_for_key(data_node_key key) const;
+        inline QString m_absolute_path_for_entity(const QModelIndex& index) const;
+        inline QString m_id_for_index(const QModelIndex& index);
         inline QString m_id_for_index(const QModelIndex& index) const;
-        inline const reflexive_entity& m_item_for_index(const QModelIndex& index) const;
-        inline QModelIndex m_reset_root_query(const QString& text);
+        inline QString m_uri_for_index(const QModelIndex& index) const;
+        inline reflexive_entity& m_entity_for_index(const QModelIndex& index);
+        inline const reflexive_entity& m_entity_for_index(const QModelIndex& index) const;
+        inline QModelIndex m_reset_root_query(const QString& uri);
         inline bool m_valid_index(const QModelIndex& index) const;
         inline bool m_is_concept(const QModelIndex& index) const;
-        inline bool m_has_thumbnail_loaded(const QString& name, const int node_key, sz::thumbnail_target_size size) const;
-        inline bool m_has_thumbnail_loaded(const QString& name, const int node_key) const;
-        inline const QPixmap& m_thumbnail_for_entity(const QString& name, const int node_key, sz::thumbnail_target_size size) const;
-        inline const QPixmap& m_thumbnail_for_entity(const QString& name, const int node_key) const;
-        inline void m_async_sort(int key, int column, Qt::SortOrder order);
-        inline void m_async_sort(int key, entity_attribute_type sort_key, Qt::SortOrder sort_order);
-        inline void m_sort(int key, int column, Qt::SortOrder order);
+        inline bool m_has_thumbnail_loaded(const QString& name, data_node_key node_key, sz::thumbnail_target_size size) const;
+        inline bool m_has_thumbnail_loaded(const QString& name, data_node_key node_key) const;
+        inline const QPixmap& m_thumbnail_for_entity(const QString& name, data_node_key node_key, sz::thumbnail_target_size size) const;
+        inline const QPixmap& m_thumbnail_for_entity(const QString& name, data_node_key node_key) const;
+        inline void m_sort(data_node_key key, int column, Qt::SortOrder order);
         
         private:
         using enum entity_attribute_type;
@@ -249,59 +207,12 @@ namespace rin
         QBasicTimer m_pending_query_timer;
         QBasicTimer m_delayed_sort_timer;
         QBasicTimer m_delayed_info_fetch_timer;
-        std::optional<int> m_root;
+        std::optional<data_node_key> m_root;
         std::optional<int> m_sort_column;
         std::optional<Qt::SortOrder> m_sort_order;
         sz::thumbnail_target_size m_thumbnail_target_size;
         int m_batchsize;
         bool m_readonly;
     };
-
-    template <typename T> requires std::same_as<T, entity_tree_node> || std::same_as<T, std::vector<reflexive_entity>>
-    inline void entity_model::m_insert_entities(const QModelIndex& parent, int key, int start, int end, const T& data, bool copy_in)
-    {
-        using enum entity_attribute_type;
-        using enum sz::entity_type;
-        
-        qDebug() << "entity_model: begin insert for: " << parent << ", start: " << start << ", end: " << end;
-
-        if constexpr (std::same_as<T, entity_tree_node>)
-        {
-            if (copy_in)
-            {
-                beginInsertRows(parent, start, end);
-                m_tree[key] = data;
-                endInsertRows();
-                return;
-            }
-        }        
-        beginInsertRows(parent, start, end);
-        entity_tree_node& node = m_tree[key];
-        for (int i = start, j = 0; i <= end; ++i, ++j)
-        {
-            const int data_index = [&]() -> int { if constexpr (std::same_as<T, entity_tree_node>) { return i; } return j; }(); // lol
-            
-            reflexive_entity e = data[data_index];
-            if (e.type() == File)
-            {
-                const auto& info = e.attribute<QFileInfo>();
-                if (const QString id = info.absoluteFilePath(); m_tree.contains(id))
-                {
-                    const int child_key = m_tree.key_for_querytext(id);
-                    m_tree[child_key].index = i;
-                    m_tree[child_key].parent = key;
-                    e.set_key(child_key);
-                }
-
-                if (e.has_attribute(Mime_Type) && !e.has_attribute(Icon))
-                {
-                    const QIcon icon = m_get_icon(e);
-                    e.set_attribute(Icon, icon);
-                }
-            }
-            node.insert(std::move(e));
-        }
-        endInsertRows();
-    }
 
 } // namespace rin

@@ -64,15 +64,16 @@ generate_export_header(
 )
 
 set(public_headers #!BEGIN: HEADER LIST
+  src/${PROJECT_NAME}/vector.hpp
   src/${PROJECT_NAME}/exception.hpp
   src/${PROJECT_NAME}/types.hpp
+  src/${PROJECT_NAME}/string.hpp
   src/${PROJECT_NAME}/sz_export.hpp
-  src/${PROJECT_NAME}/basic_vectors.hpp
+  src/${PROJECT_NAME}/file.hpp
   src/${PROJECT_NAME}/result.hpp
   src/${PROJECT_NAME}/entity/database.hpp
   src/${PROJECT_NAME}/entity/entity.hpp
   src/${PROJECT_NAME}/entity/common.hpp
-  src/${PROJECT_NAME}/entity/registry.hpp
   src/${PROJECT_NAME}/core/ctl.hpp
   src/${PROJECT_NAME}/sqlite/common.hpp
   src/${PROJECT_NAME}/sqlite/query.hpp
@@ -81,8 +82,10 @@ set(public_headers #!BEGIN: HEADER LIST
   src/${PROJECT_NAME}/utility/hash.hpp
   src/${PROJECT_NAME}/utility/reference_counter.hpp
   src/${PROJECT_NAME}/utility/string.hpp
+  src/${PROJECT_NAME}/utility/visitor.hpp
   src/${PROJECT_NAME}/utility/domain.hpp
   src/${PROJECT_NAME}/utility/thumbnail.hpp
+  src/${PROJECT_NAME}/utility/shared_data.hpp
   src/${PROJECT_NAME}/utility/config_utils.hpp
   src/${PROJECT_NAME}/utility/json.hpp
   src/${PROJECT_NAME}/utility/shared_library.hpp
@@ -94,9 +97,10 @@ set(public_headers #!BEGIN: HEADER LIST
 
 set(sources #!BEGIN: SOURCE LIST
   ${public_headers}
+  src/${PROJECT_NAME}/file.cpp
   src/${PROJECT_NAME}/entity/database.cpp
   src/${PROJECT_NAME}/entity/common.cpp
-  src/${PROJECT_NAME}/entity/registry.cpp
+  src/${PROJECT_NAME}/entity/entity.cpp
   src/${PROJECT_NAME}/core/ctl.cpp
   src/${PROJECT_NAME}/sqlite/database.cpp
   src/${PROJECT_NAME}/sqlite/query.cpp

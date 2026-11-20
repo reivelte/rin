@@ -25,6 +25,7 @@
 #include <suzuri/utility/thumbnail.hpp>
 #include "window.hpp"
 #include "view/view.hpp"
+#include "widgets/querybox.hpp"
 #include "widgets/navigationpanel.hpp"
 #include "widgets/tag_view/tag_view.hpp"
 #include "widgets/iconsizer.hpp"
@@ -44,7 +45,7 @@ namespace rin
         m_details_panel = nullptr;
         m_tagger = nullptr;
 
-        m_model = new entity_model(this, ":memory:"); // is this a good default for the database?
+        m_model = new entity_model(":memory:", this); // is this a good default for the database?
         m_model->set_batchsize(100000); // TODO: make configurable
         m_model->set_readonly(false);
 
@@ -79,11 +80,14 @@ namespace rin
         m_set_viewmode(viewmode);
         m_view->setModel(m_model);
         
-        m_lineedit = new QLineEdit;
+        m_querybox = new querybox(m_model, this);
+        auto sp = m_querybox->sizePolicy();
+        sp.setHorizontalStretch(1);
+        m_querybox->setSizePolicy(sp);
         m_location_bar = new QToolBar("LocationBar", this);
         m_location_bar->setFloatable(false);
         m_location_bar->setMovable(false);
-        m_location_bar->addWidget(m_lineedit);
+        m_location_bar->addWidget(m_querybox);
         addToolBar(Qt::ToolBarArea::TopToolBarArea, m_location_bar);
 
         // ------- begin navigation toolbar setup
@@ -141,7 +145,7 @@ namespace rin
 
         setCentralWidget(m_view);
 
-        connect(m_lineedit, &QLineEdit::returnPressed, this, &main_window::read_input);
+        connect(m_querybox, &querybox::return_pressed, this, &main_window::read_input);
         connect(m_view, &entity_view::clicked, this, &main_window::select_item);
         connect(m_view, &entity_view::navigate_request, this, &main_window::navigate);
         connect(m_view, &entity_view::activated, this, &main_window::open_item);
@@ -204,13 +208,13 @@ namespace rin
         Q_UNUSED(index);
         
         qDebug() << "window: update status: view counts";
-        entity_model::item_properties props;
-        props.identifier = m_model->root_query();
-        for (const QModelIndex& idx : m_view->expanded_indexes())
-        {
-            props += m_model->properties(idx);
-        }
-        m_update_view_stats(props);
+        // entity_model::item_properties props;
+        // props.identifier = m_model->root_uri();
+        // for (const QModelIndex& idx : m_view->expanded_indexes())
+        // {
+        //     props += m_model->properties(idx);
+        // }
+        // m_update_view_stats(props);
     }
 
     void main_window::update_status_view_selected_counts(qsizetype count)
@@ -250,7 +254,7 @@ namespace rin
 
     void main_window::read_input()
     {
-        m_query(m_lineedit->text());
+        m_query(m_querybox->text());
     }
 
     void main_window::navigate_to_navpanel_item(int item_index)
@@ -494,9 +498,15 @@ namespace rin
         m_details_panel->set_item(index);
     }
 
-    void main_window::contextMenuEvent(QContextMenuEvent* e)
+    void main_window::contextMenuEvent(QContextMenuEvent* event)
     {
-        QMainWindow::contextMenuEvent(e);
+        QMainWindow::contextMenuEvent(event);
+    }
+
+    void main_window::moveEvent(QMoveEvent* event)
+    {
+        QMainWindow::moveEvent(event);
+        emit moved(event->oldPos(), event->pos());
     }
 
     void main_window::m_query(const QString& text)
@@ -504,16 +514,16 @@ namespace rin
         if (const QModelIndex root = m_model->query(text); m_model->valid_index(root))
         {
             m_historyman.step_forward_with(text);
-            m_lineedit->setText(m_model->root_query());
+            m_querybox->set_text(m_model->root_uri());
             m_view->setRootIndex(root);
             m_set_window_title();
-            m_update_view_stats({});
+            // m_update_view_stats({});
         }
     }
 
     void main_window::m_set_window_title()
     {
-        auto title = std::format("[{}] {}", m_database_path.stem().string(), m_model->root_query().toStdString());
+        auto title = std::format("[{}] {}", m_database_path.stem().string(), m_model->root_uri().toStdString());
         setWindowTitle(QString::fromStdString(title));
     }
 
@@ -533,7 +543,7 @@ namespace rin
     void main_window::m_set_root(const QModelIndex& index)
     {
         m_view->setRootIndex(index);
-        m_lineedit->setText(m_model->id_for_index(index));
+        m_querybox->set_text(m_model->id_for_index(index));
         update_status_view_counts(QModelIndex());
     }
 
@@ -591,12 +601,12 @@ namespace rin
         return m;
     }
 
-    void main_window::m_update_view_stats(const entity_model::item_properties& props)
-    {
-        m_status_text = m_make_view_stats_status_message(props.size, props.dir_count, props.file_count, props.tag_count);
-        m_status_bar->showMessage(m_status_text);
-        update_status_view_selected_counts(m_view->selected_indexes().size());
-    }
+    // void main_window::m_update_view_stats(const entity_model::item_properties& props)
+    // {
+    //     m_status_text = m_make_view_stats_status_message(props.size, props.dir_count, props.file_count, props.tag_count);
+    //     m_status_bar->showMessage(m_status_text);
+    //     update_status_view_selected_counts(m_view->selected_indexes().size());
+    // }
 
     void main_window::m_create_menubar()
     {

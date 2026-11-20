@@ -27,7 +27,7 @@ namespace sz
         case Concept:   { prefix = CONCEPT_URI_PREFIX; break; }
         case File:      { prefix = FILE_URI_PREFIX; break; }
         case Alias:
-        case Tag:       { prefix = TAG_URI_PREFIX; break; }
+        case Tag:       { prefix = INDEX_URI_PREFIX; break; }
         }
         return prefix + id;
     }
@@ -41,7 +41,8 @@ namespace sz
         
         if (uri.starts_with(CONCEPT_URI_PREFIX))    { subs = CONCEPT_URI_PREFIX.size(); type = Concept; }
         else if (uri.starts_with(FILE_URI_PREFIX))  { subs = FILE_URI_PREFIX.size(); type = File; }
-        else if (uri.starts_with(TAG_URI_PREFIX))   { subs = TAG_URI_PREFIX.size(); type = Tag; }
+        else if (uri.starts_with(INDEX_URI_PREFIX))   { subs = INDEX_URI_PREFIX.size(); type = Tag; }
+        else if (uri.starts_with(HTTPS_URI_PREFIX)) { subs = HTTPS_URI_PREFIX.size(); type = File; }
         // otherwise the uri is invalid
 
         return { uri.substr(subs), type };

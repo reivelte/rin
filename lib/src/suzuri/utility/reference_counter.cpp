@@ -54,6 +54,7 @@ namespace sz
     {
         m_decrement_or_delete();
         m_count = new std::atomic<int>;
+        m_increment();
     }
 
     void reference_counter::m_increment()
@@ -70,17 +71,21 @@ namespace sz
     {
         if (m_count)
         {
-            if (m_count->load() > 0)
-            { m_decrement(); }
-            else
-            { delete m_count; }
+            if (m_count->load() > 1) {
+                m_decrement();
+            }
+            else {
+                delete m_count;
+                m_count = nullptr;
+            }
         }
     }
 
     void reference_counter::m_decrement_and_replace(std::atomic<int>* ptr)
     {
-        if (m_count == ptr)
-        { return; }
+        if (m_count == ptr) {
+            return;
+        }
 
         m_decrement_or_delete();
         m_count = ptr;

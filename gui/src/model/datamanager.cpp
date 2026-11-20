@@ -7,364 +7,257 @@
 #include <QtCore/QCoreApplication>
 #include <suzuri/utility/string.hpp>
 #include <suzuri/utility/thumbnail.hpp>
+#include <suzuri/utility/visitor.hpp>
 #include <suzuri/metadata/tags.hpp>
+#include "entitymodel.hpp"
 #include "datamanager.hpp"
 
 namespace rin
 {
-    entity_data_manager::entity_data_manager(const std::filesystem::path& database_path, QObject* parent)
-    : QThread(parent), m_mutex(), 
-    m_database(database_path), m_watcher(nullptr),
-    m_batchsize(10000), m_deadline(200), m_watcher_enabled(false)
+    entity_data_manager::entity_data_manager(const std::filesystem::path& database_path, entity_model* model, QObject* parent) :
+        QThread(parent),
+        m_working(false),
+        m_watcher(nullptr),
+        m_database_path(database_path),
+        m_batchsize(10000),
+        m_deadline(0),
+        m_model(model)
     {
+        m_global_continue_condition = std::nullopt;
+        m_clear_interrupt_flag();
         start(QThread::Priority::LowPriority);
-        m_do_interrupt.clear();
     }
 
     entity_data_manager::~entity_data_manager()
     {
-        m_request_abort();
-        
-        if (m_watcher)
-        { delete m_watcher; }
-        
+        request_abort();
         wait();
-    }
-
-     void entity_data_manager::watch_path(const QString& path)
-    {
-        QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
-        if (m_watcher_enabled)
-        {
-            qDebug() << "entity_data_manager: watch path: " << path;
-            m_watcher->addPath(path);
-        }
-    }
-
-    void entity_data_manager::unwatch_path(const QString& path)
-    {
-        QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
-        if (m_watcher_enabled && m_watcher->directories().contains(path))
-        {
-            qDebug() << "entity_data_manager: unwatch path: " << path;
-            m_watcher->removePath(path);
-        }
     }
 
     void entity_data_manager::set_watcher_enabled(bool enabled)
     {
         QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
 
-        if (m_watcher_enabled == enabled)
-        { return; }
-
-        m_watcher_enabled = enabled;
-        if (!m_watcher_enabled)
-        {
-            delete m_watcher;
-            m_watcher = nullptr;
+        if (enabled && m_watcher) {
+            return;
         }
-        else
-        { m_watcher = m_create_watcher(); }
+        m_watcher.reset(enabled ? m_create_watcher() : nullptr);
     }
 
-    void entity_data_manager::set_batchsize(size_t size)
+    // eventually this function will do more than just add a path to the filesystem watcher
+    void entity_data_manager::set_watched(const QString& uri, bool watched)
     {
         QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
+
+        if (m_watcher)
+        {
+            const std::string uri_ = uri.toStdString();
+            const auto [id, uri_type] = sz::id_from_uri(uri_);
+
+            if (uri_type == sz::entity_type::File)
+            {
+                const auto path = QString::fromUtf8(id.data(), static_cast<qsizetype>(id.size()));
+                if (watched) {
+                    m_watcher->addPath(path);
+                }
+                else {
+                    m_watcher->removePath(path);
+                }
+            }
+        }
+    }
+
+    void entity_data_manager::set_batchsize(int size)
+    {
         m_batchsize = size;
     }
 
     void entity_data_manager::set_deadline(int ms)
     {
-        QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
         m_deadline = ms;
     }
 
     void entity_data_manager::set_database(const std::filesystem::path& path)
     {
         QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
-        m_database.set_database(path);
+
+        m_interrupt_job_thread();
+        m_database_path = path;
+        m_continue_job_thread(continue_condition::Reset);
     }
 
     void entity_data_manager::clear()
     {
         QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
-        m_queries.clear();
-        m_fetches.clear();
-        m_sources.clear();
-        m_invalidated.clear();
-        m_nodes.clear();
-        m_extended_reads.clear();
-        m_extended_read_positions.clear();
-        m_pending_sort.clear();
-        m_pending_sort_keys.clear();
-        m_database.clear_cache();
-        if (m_watcher_enabled)
-        {
+
+        m_interrupt_job_thread();
+        m_queue.clear();
+        m_jobs.clear();
+        
+        if (m_watcher) {
             m_watcher->removePaths(m_watcher->directories());
         }
+        m_continue_job_thread(continue_condition::Discard_All);
     }
 
     void entity_data_manager::request_abort()
     {
-        m_request_abort();
+        QMutexLocker locker(&m_mutex);
+
+        requestInterruption();
+        m_interrupt_job_thread();
+        m_continue_job_thread(continue_condition::None);
     }
 
-    // possible queries and their syntax:
-    //  (1) absolute directory path (i.e. /home/user/Pictures): produce all files and dirs in that directory
-    //  (2) tag query (i.e. cat,dog|bird): produce all files/dirs/entities/etc. that are tagged with 
-    //  the tags given in the query string (see <suzuri/entity/database.hpp> for the query syntax)
-    //  (3) "tagsof:{query}" produce all of the tags that occur in the set produced by query, along with the count of times each tag appears
-    int entity_data_manager::query(const QString& short_text, entity_tree& tree, int index, int parent, std::optional<entity_attribute_type> sort_key, std::optional<Qt::SortOrder> sort_order)
+    void entity_data_manager::enqueue(data_node dst, data_node opt, query_operator_flags op, enqueue_position pos)
     {
-        qDebug() << "entity_data_manager: call query(): " << short_text;
-
-        QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
-
-        auto query_type = m_query_type(short_text);
-        const auto ft = query_descriptor::full_text(short_text, query_type);
-
-        int k = 0;
-        if (m_nodes.contains(ft))
-        {
-            k = m_nodes[ft].key;
-        }
-        else
-        {
-            assert(!m_sources.contains(ft));
-            m_sources.emplace(ft, m_create_source(short_text, query_type));
-            query_descriptor qd = m_create_query_descriptor(short_text, m_sources.at(ft));
-            if (sort_key && sort_order)
-            {
-                qd.sort_key = sort_key;
-                qd.sort_order = sort_order;
-            }
-            k = tree.make_node(qd, index, parent);
-            m_nodes.emplace(ft, std::as_const(tree[k]));
-            m_queries.push_front({ft, query_descriptor::query_mode::Read});
-        }
-        m_tell_job_thread_to_continue();
-        m_have_query.wakeAll();
-        return k;
-    }
-
-    int entity_data_manager::query(const QString& short_text, entity_tree& tree, const QList<QUrl>& urls, int index, int parent)
-    {
-        using enum query_descriptor::query_type;
-        qDebug() << "entity_data_manager: call query() for concept: " << short_text;
-
-        QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
-
-        const QString ft = short_text.startsWith("concept://") ? short_text : query_descriptor::full_text(short_text, Concept);        
-        int k = 0;
-        if (m_nodes.contains(ft))
-        {
-            k = m_nodes[ft].key;
-        }
-        else
-        {
-            m_sources.emplace(ft, m_create_source(urls));
-            const auto qd = m_create_query_descriptor(short_text, m_sources.at(ft));
-            k = tree.make_node(qd, index, parent);
-            m_nodes.emplace(ft, std::as_const(tree[k]));
-            m_queries.push_front({ft, qd.mode});
-        }
-        m_tell_job_thread_to_continue();
-        m_have_query.wakeAll();
-        return k;
-    }
-
-    void entity_data_manager::query(const entity_tree_node& node)
-    {
-        const QString ft = node.descriptor.full_text();
-        qDebug() << "entity_data_manager: call query() for extended read of: " << ft;
-
-        QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
-
-        if (!m_extended_reads.contains(ft))
-        {
-            assert(!m_extended_read_positions.contains(ft));
-            m_queries.push_front({ft, query_descriptor::query_mode::Read_Extended});
-            m_extended_reads.emplace(ft, node);
-            m_extended_read_positions.emplace(ft, 0);
-        }
-        m_tell_job_thread_to_continue();
-        m_have_query.wakeAll();
-    }
-
-    void entity_data_manager::sort(entity_tree_node& node, const std::unordered_map<int, int>& keys)
-    {
-        const QString ft = node.descriptor.full_text();
-        qDebug() << "entity_data_manager: call sort(): " << ft;
-
-        QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
-
-        using enum query_descriptor::query_mode;
-        if (!m_pending_sort.contains(ft))
-        {
-            assert(!m_pending_sort_keys.contains(ft));
-            node.descriptor.mode = Sort;
-            m_queries.push_front({ft, Sort});
-            m_pending_sort.emplace(ft, std::as_const(node));
-            m_pending_sort_keys.emplace(ft, keys);
-        }
-        m_tell_job_thread_to_continue();
-        m_have_query.wakeAll();
-    }
-
-    void entity_data_manager::fetch(const QString& query_string, const std::vector<entity_model_url>& urls, fetch_action action, bool is_update)
-    {
-        qDebug() << "entity_data_manager: call fetch(): " << query_string << ", url count: " << urls.size();
-
-        QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
-        if (!m_fetches.contains(query_string))
-        {
-            m_create_fetch_query(query_string, urls, action, is_update);
-            m_queries.push_front({query_string, query_descriptor::query_mode::Fetch});
-        }
-        m_tell_job_thread_to_continue();
-        m_have_query.wakeAll();
-    }
-
-    // synchronous version
-    int entity_data_manager::tag(const std::string& entity_id, const std::vector<std::string>& tags)
-    {
-        QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
+        using enum enqueue_position;
+        using enum continue_condition;
         
-        sz::metadata::parameters args{
-            .tags = tags,
-            .sidecar_keys{},
-            .sidecar_split_character{},
-            .sidecar_alternate_root_path{},
-            .sidecar_type{},
-            .use_sidecars = false,
-            .check_tags = false
+        assert(dst);
+        
+        QMutexLocker locker(&m_mutex);
+
+        m_interrupt_job_thread();
+
+        const QString uri = opt ? opt->descriptor.uri() : dst->descriptor.uri();
+        const data_node_key key = dst->key();
+        const bool replace = m_jobs[op].contains(key);
+
+        if (replace)
+        {
+            m_jobs[op].erase(key);
+            m_discards.push_back(uri);
+        }
+        m_jobs[op].emplace(key, job_data{
+            .dst = dst,
+            .opt = opt
+        });
+        m_jobs[op][key].set_locked(true);
+        
+        switch (pos)
+        {
+        default:
+        case Front: { m_queue.emplace_front(key, op, false); break; }
+        case Back:  { m_queue.emplace_back(key, op, false); break; }
+        }
+        m_continue_job_thread(replace ? Discard : None);
+    }
+
+    void entity_data_manager::dequeue(data_node_key key, query_operator_flags op)
+    {
+        QMutexLocker locker(&m_mutex);
+
+        m_interrupt_job_thread();
+
+        auto remove_and_discard = [this, key](const job_data& job, query_operator_flags flags) -> void
+        {
+            m_discards.emplace_back(job.uri());
+            m_remove_from_queue({key, flags});
         };
-
-        std::filesystem::path path = entity_id;
-        int tags_applied = 0;
-        sz::metadata::tag_input(path, m_database, args,
-            [&](std::filesystem::path p, const std::vector<std::string>& tags, sz::result_code rc) -> bool
-            {
-                Q_UNUSED(rc); // TODO: log warning and/or show a warning dialog
-                qDebug() << "tag item: " << p.string() << " with: " << tags;
-                ++tags_applied;
-                return false;
-            },
-            [](std::string, std::string, sz::result_code) -> bool
-            {
-                return false;
-            }, false, false
-        );
-        m_tell_job_thread_to_continue();
-        return tags_applied;
-    }
-
-    index_descriptor entity_data_manager::tag(const QString& entity_id, const sz::metadata::parameters& args)
-    {
-        using enum query_descriptor::query_mode;
-        QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
-
-        if (!m_indexed_writes.contains(entity_id))
-        {
-            auto qd = m_create_query_descriptor(entity_id, args);
-            qd.status = query_descriptor::query_status::Initializing;
-            m_queries.emplace_front(entity_id, qd.mode);
-            m_indexed_writes.emplace(entity_id, index_descriptor{
-                .query = qd,
-                .args = args
-            });
+        if (op && m_jobs[op].contains(key)) {
+            remove_and_discard(m_jobs[op][key], op);
         }
-        const auto qd = m_indexed_writes.at(entity_id);
-        m_tell_job_thread_to_continue();
-        m_have_query.wakeAll();
-        return qd;
-    }
-
-    void entity_data_manager::continue_query()
-    {
-        qDebug() << "entity_data_manager: call continue_query()";
-
-        QMutexLocker locker(&m_mutex);
-        m_tell_job_thread_to_continue();
-    }
-
-    void entity_data_manager::continue_query(const query_descriptor& qd)
-    {
-        using enum query_descriptor::query_mode;
-        QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
-
-        const QString ft = qd.full_text();
-        if (!m_is_in_queue(qd))
-        {
-            // use query() to start a new query
-            qWarning() << "entity_data_manager: invalid use of continue_query(qd). qd was: " << ft;
-            return;
-        }
-        
-        qDebug() << "entity_data_manager: continue query for: " << ft;
-
-        if (const auto& [s, m] = m_queries.front(); s == ft && m == qd.mode)
-        { m_tell_job_thread_to_continue(); }
         else
         {
-            m_remove_from_queue(qd);
-            m_queries.push_front({ft, qd.mode});
-            m_tell_job_thread_to_continue();
+            for (auto& [op_flags, map] : m_jobs)
+            {
+                if (map.contains(key)) {
+                    remove_and_discard(map[key], op_flags);
+                }
+            }
         }
+        m_continue_job_thread(continue_condition::Discard);
     }
 
-    void entity_data_manager::cancel_query(const query_descriptor& qd)
+    data_source entity_data_manager::create_source(const reflexive_descriptor& d)
     {
-        using enum query_descriptor::query_mode;
-        QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
+        return m_create_source(d);
+    }
 
-        const QString ft = qd.full_text();
-        qDebug() << "entity_data_manager: call cancel_query() for: " << ft << ", mode: " << std::to_underlying(qd.mode);
+    reflexive_entity entity_data_manager::create_entity(const data_node& data, QString parent_id, QString id, query_operator_flags flags)
+    {
+        Q_UNUSED(data);
+        return m_create_entity(parent_id, id, std::nullopt, flags & query_operator::Read_Extended);
+    }
+
+    // iterate over a source, signaling to any connected objects (via push_result()) after
+    //   - m_deadline milliseconds (continues iterating)
+    //   - when m_batchsize is reached, (stops)
+    //   - or when the source has been exhausted (stops)
+    // returns true if iteration over the source has completed or m_batchsize items were retrieved (m_batchsize >= query size)
+    // returns false if an interruption occured or if m_batchsize items were reached (batch_size < query size)
+    // this function assumes there is no active mutex lock and no other thread attempting to read/write internal data structures
+    bool entity_data_manager::read(data_node& dst, data_node& opt, data_source& source, query_operator_flags flags)
+    {
+        using enum query_status;
+        using enum query_source;
+        using enum entity_tree_node_state;
+        using namespace rin::detail;
+
+        usize expected_size = dst->size();
+        bool done = true;
         
-        m_erase_job_data(ft, qd.mode);
-        m_remove_from_queue(ft, qd.mode);
-    }
+        if (reflexive_descriptor& d = opt ? opt->descriptor : dst->descriptor; d.status() == Initializing)
+        {
+            d.set_size(source.size());
+            d.set_status(In_Progress);
+            expected_size += d.size();
+            if (opt) {
+                expected_size += opt->size();
+            }
+        }
+        if (const data_node_key key = dst->key(); dst->state() == Invalidated)
+        {
+            m_invalidated[key].reserve(dst->size());
+            m_invalidated[key].insert_range(*dst);
+            dst->set_state(Updating);
+        }
+        dst->reserve(std::min(static_cast<usize>(dst->size()) + m_batchsize, expected_size));
 
-    void entity_data_manager::cancel_query(const QString& text, query_descriptor::query_mode mode)
-    {
-        using enum query_descriptor::query_mode;
-        QMutexLocker locker(&m_mutex);
-        m_interrupt_and_wait_for_job_thread();
+        if (expected_size)
+        {
+            auto do_read_impl = [&]<typename Source>(data_source& src) -> bool
+            {
+                return m_read<Source>(dst, opt, src, expected_size, flags);
+            };
+#define do_read(S, X) do_read_impl.template operator()<S>(X)
+            switch (source.type())
+            {
+            case Filesystem: { done = do_read(filesystem_source, source); break; }
+            case Index: { done = do_read(database_source, source); break; }
+            case Concept: { done = do_read(concept_source, source); break; }
+            default:
+            {
+                qWarning() << "entity_data_manager: tried to use unknown source";
+                break;
+            }
+            }
+#undef do_read
+        }
+        if (done)
+        {
+            const QString uri = opt ? opt->descriptor.uri() : dst->descriptor.uri();
 
-        qDebug() << "entity_data_manager: call cancel_query() for: " << text << ", mode: " << std::to_underlying(mode);
-
-        m_erase_job_data(text, mode);
-        m_remove_from_queue(text, mode);
+            m_sources.erase(uri);
+            m_results.erase(uri);
+        }
+        return done;
     }
 
     bool entity_data_manager::event(QEvent* e)
     {
         if (e->type() == QEvent::DeferredDelete && isRunning())
         {
-            m_request_abort();
+            request_abort();
             if (!wait(5000))
             {
-                if (QCoreApplication::closingDown())
-                { terminate(); }
-                else
-                { connect(this, &QThread::finished, this, [this]{ delete this; }); }
+                if (QCoreApplication::closingDown()) {
+                    terminate();
+                }
+                else {
+                    connect(this, &QThread::finished, this, [this]{ delete this; });
+                }
                 return true;
             }
         }
@@ -380,725 +273,368 @@ namespace rin
         {
             QMutexLocker locker(&m_mutex);
             
-            while (!isInterruptionRequested() && m_queries.empty())
+            while (!isInterruptionRequested() && m_queue.empty())
             {
                 // nothing to do. wait for work to arrive 
-                m_have_query.wait(&m_mutex);
+                m_continue_exec.wait(&m_mutex);
             }
-
-            if (isInterruptionRequested())
-            { return; }
-            
-            if (m_exec(m_mutex, std::as_const(m_queries).front()))
-            { return; }
+            if (isInterruptionRequested()) {
+                break;
+            }
+            m_exec(m_queue.front());
         }
     }
 
-    void entity_data_manager::m_request_abort()
+    // must always be called with m_mutex locked
+    // TODO: system for reusing query results
+    // TODO: a node with a non-zero key is assumed to be a standard entity_tree_node,
+    //       which only uses query_descriptor for its descriptor. In order to make it
+    //       possible to start different types of jobs (like for a node with a concept_descriptor),
+    //       we need to figure out the key situation. A possible solution would be to
+    //       just use negative ints to specify that the node (dst) is for a random query,
+    //       then the model could have a separate keymap to store the results for said queries.
+    //       The random query system would help facilitate the implementation of the
+    //       query-result-reuse system.
+    void entity_data_manager::m_exec(job_frame frame)
     {
-        requestInterruption(); // thread safe
-        QMutexLocker locker(&m_mutex);
-        
-        // wake ourself up to prepare for abort
-        // we don't want to wait here for any reason, so we dont call the usual m_interrupt_and_wait_for_job_thread()
-        m_do_interrupt.test_and_set();
-        m_have_query.wakeAll();
-        m_tell_job_thread_to_continue();
-    }
-
-    // expects caller to be holding m_mutex in a locked state
-    void entity_data_manager::m_interrupt_and_wait_for_job_thread()
-    {
-        m_do_interrupt.test_and_set();
-        if (m_working)
-        { m_no_work_being_performed.wait(&m_mutex); }
-    }
-
-    inline void entity_data_manager::m_tell_job_thread_to_continue()
-    {
-        m_do_interrupt.clear();
-        m_should_continue.test_and_set();
-        m_continue_query.wakeAll();
-    }
-
-    inline bool entity_data_manager::m_is_in_queue(const query_descriptor& qd)
-    {
-        const QString ft = qd.full_text();
-        return std::any_of(m_queries.begin(), m_queries.end(), [&](const std::tuple<QString, query_descriptor::query_mode>& t) -> bool
+        m_clear_interrupt_flag();
+        m_evaluate_continue_condition(frame);
+        if (m_jobs[frame.op].contains(frame.key))
         {
-            const auto& [s, m] = t;
-            return s == ft && m == qd.mode;
-        });
-    }
-
-    inline void entity_data_manager::m_erase_job_data(const QString& text, query_descriptor::query_mode mode)
-    {
-        using enum query_descriptor::query_mode;
-        switch (mode)
-        {
-        case Read:
-        {
-            m_nodes.erase(text);
-            m_sources.erase(text);
-            m_invalidated.erase(text);
-            break;
-        }
-        case Read_Extended:
-        {
-            m_extended_reads.erase(text);
-            m_extended_read_positions.erase(text);
-            break;
-        }
-        case Sort:
-        {
-            m_pending_sort.erase(text);
-            m_pending_sort_keys.erase(text);
-            break;
-        }
-        case Fetch:
-        {
-            m_fetches.erase(text);
-            break;
-        }
-        default:
-            break;
-        }
-    }
-
-    inline void entity_data_manager::m_remove_from_queue(const query_descriptor& qd)
-    {
-        m_remove_from_queue(qd.full_text(), qd.mode);
-    }
-
-    inline void entity_data_manager::m_remove_from_queue(const QString& text, query_descriptor::query_mode mode)
-    {
-        auto new_end = std::remove_if(m_queries.begin(), m_queries.end(),
-        [&](const std::tuple<QString, query_descriptor::query_mode>& t) -> bool
-        {
-            const auto& [s, m] = t;
-            return s == text && m == mode;
-        });
-        m_queries.erase(new_end, m_queries.end());
-    }
-
-    int64_t entity_data_manager::m_query_size(const QString& text)
-    {
-        using enum query_descriptor::query_type;
-        using namespace rin::detail;
-        int64_t size = 0;
-        if (QFile::exists(text))
-        {
-            QDirListing dir(text);
-            for (auto it = dir.begin(); it != dir.end(); ++it)
-            { ++size; }
-        }
-        else // database
-        {
-            // TODO
-            size = static_cast<int64_t>(m_database.files(sz::entity_database_query{.string = text.toStdString()}).size());
-        }
-        return size;
-    }
-
-    bool entity_data_manager::m_query_size(query_descriptor& qd, entity_data_manager::data_source& source, bool emit_signal)
-    {
-        using enum query_descriptor::query_type;
-        using enum query_descriptor::query_status;
-        using namespace rin::detail;
-        int64_t size = qd.size > 0 ? qd.size : 0;
-        bool stopped_early = false;
-        auto type = source.type();
-        if (type == Filesystem)
-        {
-            filesystem_source& fs_src = source;
-            while (fs_src.it != fs_src.dir.end())
+            job_data job = m_jobs[frame.op][frame.key];
+            if (job.dst->locked) // node is locked in enqueue() upon initial insert, unlock here after copying the node
             {
-                ++size;
-                ++fs_src.it;
-                if (m_do_interrupt.test())
+                m_jobs[frame.op][frame.key].copy(job.dst, job.opt);
+                job.set_locked(false);      // unlock the model's copy now
+                job = m_jobs[frame.op][frame.key]; // reset job to our local copy
+            }
+            m_set_state(manager_state::Working); // mutex unlock
+            frame.done = m_exec_query(job, frame.op); // those who do not work, do not eat
+            m_set_state(manager_state::Idle); // mutex lock
+            // no need to reset job into job_map here
+        }
+        else {
+            m_remove_from_queue(frame);
+        }
+        m_evaluate_continue_condition(frame);
+        m_clear_interrupt_flag();
+    }
+
+    bool entity_data_manager::m_exec_query(job_data& job, query_operator_flags op)
+    {
+        using namespace query_operator;
+
+        if (op & Read)
+        {
+            const QString uri = job.uri();
+
+            if (!m_sources.contains(uri)) {
+                m_sources.emplace(uri, create_source(job.descriptor()));
+            }
+            return read(job.dst, job.opt, m_sources.at(uri), op);
+        }
+        else if ((op & Sort) && job.dst->descriptor.sort_info() && job.dst->size() > 1)
+        {
+            const QString uri = job.dst->descriptor.uri();
+            auto index_changes = m_sort(*job.dst);
+
+            m_results[uri] = rin::make_data_node(*job.dst);
+
+            emit data_available(data_node_update{
+                .node = m_results[uri],
+                .start = 0,
+                .end = job.dst->size() - 1,
+                .flags = op,
+                .indexes_changed_from_sort = index_changes,
+                .indexes_changed_from_remove = std::nullopt,
+                .indexes_removed = std::nullopt
+            });
+        }
+        return true;
+    }
+
+    void entity_data_manager::m_remove_from_queue(job_frame frame)
+    {
+        auto new_end = std::remove_if(m_queue.begin(), m_queue.end(),
+        [&](const job_frame& f) -> bool
+        {
+            return frame.key == f.key && frame.op == f.op;
+        });
+        m_queue.erase(new_end, m_queue.end());
+    }
+
+    std::optional<data_node_layout_changes> entity_data_manager::m_adjust_indexes(entity_tree_node& node)
+    {
+        if (query_descriptor& qd = node.descriptor; qd.keymap)
+        {
+            std::unordered_map<data_node_key, int>& keymap = *qd.keymap;
+            QList<QModelIndex> old_indexes;
+            QList<QModelIndex> new_indexes;
+
+            for (int i = 0; i < node.size(); ++i)
+            {
+                if (const data_node_key k = node[i].key(); keymap.contains(k))
                 {
-                    stopped_early = true;
-                    break;
+                    const reflexive_entity& e = node[i]; // i is the new index
+                    old_indexes << m_model->create_index(e, keymap[k]);
+                    new_indexes << m_model->create_index(e, i);
+                    keymap[k] = i;
+                    // the node index is updated later in the model itself
                 }
             }
-            
-            if (!stopped_early)
-            { fs_src.it = fs_src.dir.begin(); }
-            else
-            { qd.status = Initializing; }
+            if (new_indexes.size()) {
+                return std::make_tuple(old_indexes, new_indexes);
+            }
         }
-        else if (type == Indexed)
-        {
-            database_source& db_src = source;
-            size = db_src.size();
-        }
-        else if (type == Concept)
-        {
-            concept_source& data = source;
-            size = static_cast<int64_t>(data.urls.size());
-        }
-        qd.size = size;
-        
-        if (emit_signal)
-        { emit data_available(qd, {}); }
-        
-        return stopped_early;
+        return std::nullopt;
     }
 
-    query_descriptor::query_type entity_data_manager::m_query_type(const QString& short_text) const
+    entity_data_manager::validate_result entity_data_manager::m_validate(entity_tree_node& node)
     {
-        using enum query_descriptor::query_type;
-        if (QFileInfo info(short_text); info.isDir())
-        { return Filesystem; }
-        else if (info.isFile())
-        { return Indexed; }
+        using enum entity_tree_node_state;
+        
+        validate_result result;
+        result.validated = true;
 
-        if (short_text.endsWith(".concept") || short_text.startsWith("concept://"))
-        { return Concept; }
-
-        return Indexed;
+        if (const data_node_key key = node.key(); node.state() == Updating && m_invalidated.contains(key) && m_invalidated[key].size())
+        {
+            data_node_index_removal_list removed;
+            for (const QString& name : m_invalidated[key]) // remove all entities from node that are still in the invalidated list
+            {
+                if (m_do_interrupt.test())
+                {
+                    result.validated = false;
+                    break;
+                }
+                if (node.contains(name)) {
+                    removed.emplace_back(name, node.index_of(name));
+                }
+            }
+            if (result.validated)
+            {
+                if (node.descriptor.type() == descriptor_type::Query)
+                {
+                    for (const auto& [name, idx] : removed) {
+                        node.erase(name);
+                    }
+                    result.removed = removed;
+                    result.changes = m_adjust_indexes(node);
+                }
+                m_invalidated.erase(key);
+            }
+        }
+        return result;
     }
 
-    entity_data_manager::data_source entity_data_manager::m_create_source(const QString& short_text, query_descriptor::query_type source_type)
+    std::optional<data_node_layout_changes> entity_data_manager::m_sort(entity_tree_node& node)
+    {
+        rin::sort_entities(node);
+
+        if (node.descriptor.type() == descriptor_type::Query) {
+            return m_adjust_indexes(node);
+        }
+        return std::nullopt;
+    }
+
+    data_source entity_data_manager::m_create_source(const reflexive_descriptor& d)
     {
         using namespace rin::detail;
-        using enum query_descriptor::query_type;
-        
-        if (source_type == Filesystem) // filesystem
-        { return entity_data_manager::data_source(filesystem_source{.dir = QDirListing(short_text), .it = QDirListing::const_iterator()}); }
-        
-        if (const QFileInfo info(short_text); info.isFile())
-        { return entity_data_manager::data_source(m_database.tags(sz::entity_database_query{.string = short_text.toStdString()})); }
+        using enum query_source;
 
-        // TODO: entity_database needs to forbid starting a tag namespace with "!". it is reserved for the entity_data_manager
-        if (short_text.startsWith(s_query_cmd_taglist.data(), Qt::CaseInsensitive)) // indexed
+        const QString text = d.text();
+        const std::string text_ = text.toStdString();
+        auto source_type = d.source();
+        
+        if (source_type == Filesystem)
         {
-            if (const std::string s = short_text.toStdString().substr(s_query_cmd_taglist.size()); s.size())
+            if (std::error_code ec; std::filesystem::is_regular_file(text_, ec) && !ec) {
+                return data_source(m_database.tags(sz::entity_database_query{ .string = text_ }));
+            }
+            return data_source(filesystem_source{.dir = QDirListing(text), .it = QDirListing::const_iterator()});
+        }
+        else if (source_type == Concept) // TODO: concept system
+        {
+            if (text.startsWith(s_query_cmd_simto.data(), Qt::CaseInsensitive))
             {
-                return entity_data_manager::data_source(m_database.tags(sz::entity_database_query{
-                    .string = s
+                return data_source(m_database.tags(sz::entity_database_query{
+                    .string = text_.substr(s_query_cmd_simto.size()),
+                    .get_similar = true
                 }));
             }
-            else
-            { return entity_data_manager::data_source(m_database.tags()); }
+            else if (text.startsWith(s_query_cmd_taglist.data(), Qt::CaseInsensitive))
+            {
+                if (const std::string s = text_.substr(s_query_cmd_taglist.size()); s.size())
+                {
+                    return data_source(m_database.tags(sz::entity_database_query{
+                        .string = s
+                    }));
+                }
+                return data_source(m_database.tags());
+            }
         }
-        
-        return entity_data_manager::data_source(m_database.files(sz::entity_database_query{
-            .string = short_text.toStdString()
+        return data_source(m_database.files(sz::entity_database_query{
+            .string = text_
         }));
     }
 
-    entity_data_manager::data_source entity_data_manager::m_create_source(const QList<QUrl>& urls)
+    inline void entity_data_manager::m_set_state(entity_data_manager::manager_state state)
     {
-        return entity_data_manager::data_source(detail::concept_source{
-            .urls = urls,
-            .position = 0
-        });
+        using enum entity_data_manager::manager_state;
+
+        switch (state)
+        {
+        case Idle:
+        {
+            m_mutex.lock();
+            setTerminationEnabled(false);
+            m_working = false;
+            break;
+        }
+        case Working:
+        {
+            m_mutex.unlock();
+            setTerminationEnabled(true);
+            m_working = true;
+            break;
+        }
+        default: { throw sz::exception(sz::result_code::Invalid_Argument, "unknown state"); }
+        }
     }
 
-    query_descriptor entity_data_manager::m_create_query_descriptor(const QString& short_text, const entity_data_manager::data_source& source) const
+    // the job thread will reset the variables changed here after the interrupt completes
+    inline void entity_data_manager::m_interrupt_job_thread()
     {
-        return {
-            .text = short_text,
-            .size = -1,
-            .processed = 0,
-            .filesize{},
-            .dir_count{},
-            .file_count{},
-            .tag_count{},
-            .type = source.type(),
-            .mode = query_descriptor::query_mode::Read,
-            .status = query_descriptor::query_status::Initializing
+        m_do_interrupt.test_and_set();
+    }
+
+    // the continue condition is checked after the thread starts again
+    // the condition will only be set if it is a higher 'severity' than the one currently set
+    // from least to highest severity: None -> Discard -> Discard_All -> Reset
+    inline void entity_data_manager::m_continue_job_thread(continue_condition condition, std::optional<job_frame> cmd_target)
+    {
+        auto weigh_condition = [&](continue_condition c1, continue_condition c2) -> continue_condition
+        {
+            return continue_condition(std::max(std::to_underlying(c1), std::to_underlying(c2)));
         };
+        if (m_queue.size())
+        {
+            job_frame frame = cmd_target ? *cmd_target : m_queue.front();
+
+            if (m_frame_cmds[frame.op].contains(frame.key))
+            {
+                auto& c = m_frame_cmds[frame.op][frame.key];
+                c = weigh_condition(c, condition);
+            }
+            else {
+                m_frame_cmds[frame.op][frame.key] = condition;
+            }
+        }
+        else
+        {
+            if (m_global_continue_condition) {
+                *m_global_continue_condition = weigh_condition(*m_global_continue_condition, condition);
+            }
+            else {
+                m_global_continue_condition = condition;
+            }
+        }
+        m_continue_exec.notify_all();
     }
 
-    query_descriptor entity_data_manager::m_create_query_descriptor(const QString& entity_id, const sz::metadata::parameters& args) const
+    inline void entity_data_manager::m_evaluate_continue_condition(const job_frame& frame)
     {
-        Q_UNUSED(args); // TODO: derive query size, file_count using args
-        return {
-            .text = entity_id,
-            .type = query_descriptor::query_type::Indexed,
-            .mode = query_descriptor::query_mode::Write,
-        };
+        using enum continue_condition;
+
+        continue_condition cond = None;
+        
+        if (m_global_continue_condition)
+        {
+            cond = *m_global_continue_condition;
+            m_global_continue_condition = std::nullopt;
+        }
+        else
+        {
+            cond = m_frame_cmds[frame.op][frame.key]; // always expected to have a value
+            m_frame_cmds[frame.op][frame.key] = continue_condition::None;
+        }
+        switch (cond)
+        {
+        default:
+        case None:
+        {
+            if (frame.done)
+            {
+                m_jobs[frame.op].erase(frame.key);
+                m_remove_from_queue(frame);
+                emit job_complete(frame.key, frame.op);
+            }
+            break;
+        }
+        // for Reset and Discard_All, it is assummed that the queue and job map are changed in the main thread
+        case Reset:
+        {
+            m_database.clear_cache();
+            m_sources.clear();
+            m_database.set_database(m_database_path);
+            m_frame_cmds.clear();
+            [[fallthrough]];
+        }
+        case Discard_All:
+        {
+            if (cond != Reset)
+            {
+                // we have to check if it hasn't already been cleared via Reset to prevent
+                // sz::sqlite::database_query's destructor from trying to finalize on a
+                // closed database connection
+                m_sources.clear();
+            }
+            m_results.clear();
+            m_discards.clear();
+            m_invalidated.clear();
+            break;
+        }
+        case Discard:
+        {
+            // the new job for the given key is already set by the main thread
+            // the current node will be destroyed provided its reference count reaches 0
+            for (const QString& uri : m_discards)
+            {
+                m_sources.erase(uri);
+                m_results.erase(uri);
+            }
+            m_discards.clear();
+            break;
+        }
+        }
     }
 
-    // TODO: http
-    // for now, we assume text refers to a place on the local filesystem
-    query_descriptor entity_data_manager::m_create_fetch_query(const QString& text, const std::vector<entity_model_url>& urls, fetch_action action, bool update_only)
+    inline void entity_data_manager::m_clear_interrupt_flag()
     {
-        m_fetches.emplace(text, fetch_descriptor{
-            .query = query_descriptor{
-                .text = text,
-                .size = static_cast<int64_t>(urls.size()),
-                .processed = 0,
-                .filesize{},
-                .dir_count{},
-                .file_count{},
-                .tag_count{},
-                .type = query_descriptor::query_type::Filesystem, // TODO
-                .mode = query_descriptor::query_mode::Fetch,
-                .status = query_descriptor::query_status::Initializing
-            },
-            .urls = urls,
-            .action = action,
-            .is_update = update_only
-        });
-        return m_fetches[text].query;
+        m_do_interrupt.clear();
     }
 
-    
-    inline reflexive_entity entity_data_manager::m_make_entity(const QString& parent_id, const QString& id, std::optional<QFileInfo> fsinfo)
+    inline reflexive_entity entity_data_manager::m_create_entity(const QString& parent_id, const QString& id, std::optional<QFileInfo> fsinfo, bool read_extended)
     {
         auto e = reflexive_entity::from_uri_or_id(id, nullptr, fsinfo);
+
         e.set_attribute(Parent_Id, parent_id);
+        if (read_extended) {
+            m_fill_extended_attributes(e);
+        }
         return e;
     }
 
-    inline void entity_data_manager::m_fill_extended_item_attributes(reflexive_entity& e)
+    inline void entity_data_manager::m_fill_extended_attributes(reflexive_entity& e)
     {
         e.fill_extended_attributes(m_database, m_mimedb, false);
     }
 
-    // returns true if iteration over the source has completed or m_batchsize items were retrieved (m_batchsize >= query size)
-    // returns false if an interruption occured or if m_batchsize items were reached (batch_size < query size)
-    // this function assumes there is no active mutex lock and no other thread attempting to read/write internal data structures
-    bool entity_data_manager::m_run_read_query(entity_tree_node& node)
-    {
-        // iterate over source, signaling to any connected objects after
-        //   - m_deadline milliseconds (continues iterating)
-        //   - when m_batchsize is reached, (stops)
-        //   - or when the source has been exhausted (stops)
-        using enum query_descriptor::query_type;
-        using enum query_descriptor::query_status;
-        using enum entity_tree_node_state;
-        using namespace rin::detail;
-        
-        const QString full_text = node.descriptor.full_text();
-        auto& source = m_sources.at(full_text);
-
-        if (node.descriptor.size <= -1 || node.descriptor.status == Initializing) // TODO: option to start the query anyways even if we don't know the full size
-        {
-            // uninitialized query. get the size
-            if (m_query_size(node.descriptor, source, node.state != Invalidated))  // will emit data_available for us and set status of qd accordingly
-            { return false; }
-            else
-            { node.descriptor.status = In_Progress; }
-        }
-        if (node.state == Invalidated)
-        {
-            m_invalidated[full_text].reserve(node.items.size());
-            m_invalidated[full_text].insert_range(node);
-            node.state = Updating;
-        }
-        node.reserve(std::min(m_batchsize, static_cast<size_t>(node.descriptor.size)));
-        
-        switch (source.type())
-        {
-        case Filesystem: { m_iterate_source<filesystem_source>(source, node); break; }
-        case Indexed:    { m_iterate_source<database_source>(source, node); break; }
-        case Concept:    { m_iterate_source<concept_source>(source, node); break; }
-        default:
-        {
-            qDebug() << "entity_data_manager: unknown source type for node: " << node.descriptor.full_text();
-            return false;
-        }
-        }
-        
-        if (m_do_interrupt.test())
-        { return false; }
-        
-        bool done = node.descriptor.processed >= node.descriptor.size || (!source.has_data());
-        node.descriptor.status = done ? Completed : In_Progress;
-        
-        if (done)
-        {
-            if (node.state == Updating && m_invalidated.contains(full_text) && m_invalidated[full_text].size())
-            {
-                std::vector<std::tuple<QString, int>> removed;
-                for (const QString& name : m_invalidated[full_text])
-                {
-                    if (m_do_interrupt.test())
-                    {
-                        done = false;
-                        break;
-                    }
-                    if (const int i = node.index_of(name); i > -1 && i < node.size())
-                    {
-                        removed.emplace_back(name, i);
-                        node.erase(name);
-                    }
-                    // no need to adjust counts here because invalidated nodes have their descriptors redone from scratch
-                }
-                if (done)
-                {
-                    m_invalidated[full_text].clear();
-                    emit data_removed(node.descriptor, removed);
-                }
-            }
-        }
-        return done;
-    }
-
-    bool entity_data_manager::m_run_extended_read_query(entity_tree_node& node, int& position)
-    {
-        qDebug() << "entity_data_manager: run extended read query for: " << node.descriptor.full_text() << ", start: " << position;
-        using enum query_descriptor::query_type;
-        using enum entity_tree_node_state;
-        using enum entity_attribute_type;
-        node.descriptor.mode = query_descriptor::query_mode::Read_Extended;
-        node.descriptor.status = query_descriptor::query_status::In_Progress;
-
-        QElapsedTimer timer;
-        timer.start();
-        int start = position;
-        int items_processed = 0;
-        for ( ; position < node.size(); ++position)
-        {
-            if (m_do_interrupt.test())
-            { break; }
-
-            reflexive_entity& e = node[position];
-            m_fill_extended_item_attributes(e);
-
-            ++items_processed;
-            ++node.descriptor.processed_extended;
-
-            if (timer.hasExpired(m_deadline))
-            {
-                if (items_processed)
-                {
-                    emit update_available(node, start, position);
-                    start = position + 1;
-                    items_processed = 0;
-                }
-                timer.restart();
-            }
-        }
-
-        const bool done = position >= node.size();
-        if (done)
-        {
-            node.descriptor.status = query_descriptor::query_status::Completed;
-            node.descriptor.mode = query_descriptor::query_mode::Read;
-        }
-        if (items_processed)
-        {
-            emit update_available(node, start, start + items_processed - 1);
-        }
-        return done;
-    }
-
-    bool entity_data_manager::m_run_sort_query(entity_tree_node& node, const std::unordered_map<int, int>& keys)
-    {
-        qDebug() << "entity_data_manager: do async sort for: " << node.descriptor.full_text() << ", size: " << node.descriptor.size;
-     
-        rin::sort_entities(node);
-        std::vector<node_index_change> changes;
-        for (int i = 0; std::cmp_less(i, node.size()); ++i)
-        {
-            if (const int k = node[i].key(); keys.contains(k))
-            {
-                changes.emplace_back(node_index_change{
-                    .key = k,
-                    .original_index = keys.at(k),
-                    .new_index = i
-                });
-            }
-        }
-        emit data_sorted(node, changes);
-        return true;
-    }
-
-    // TODO: support for http gets. for now we assume urls refers to items on the local filesystem
-    // TODO: make a version of m_push_result that doesn't require a data_source
-    // TODO: support for directories
-    bool entity_data_manager::m_run_fetch_query(fetch_descriptor& fd)
-    {
-        using enum query_descriptor::query_status;
-        using enum fetch_action;
-        static const std::set<fetch_action> returning_actions{Copy, Move, Link};
-
-        fd.query.status = In_Progress;
-        const QString parent = QDir::toNativeSeparators(fd.query.text) + QDir::separator();
-        std::vector<entity_model_url> urls_remaining = fd.urls;
-        std::vector<entity_model_url> urls_failed;
-        std::vector<entity_model_url> urls_processed;
-        std::vector<reflexive_entity> items;
-        QElapsedTimer t;
-        bool ok = true;
-
-        t.start();
-        for (const auto& url : fd.urls)
-        {
-            if (isInterruptionRequested())
-            {
-                ok = false;
-                break;
-            }
-            const QString src = url.src.toLocalFile();
-            const QString dst = parent + url.target_name;
-            const bool is_indexed = m_database.entity_exists(src.toStdString());
-            reflexive_entity item;
-            bool action_success = false;
-            bool return_item = false;
-
-            switch (fd.action)
-            {
-            case Link:      { item =           m_link_file_entity(src, dst, is_indexed); break; }
-            case Copy:      { item =           m_copy_file_entity(src, dst, is_indexed); break; }
-            case Move:      { item =           m_rename_file_entity(src, dst, is_indexed); break; }
-            case Remove:    { action_success = m_remove_file_entity(src, is_indexed); break; }
-            case Recycle:   { action_success = m_recycle_file_entity(src, is_indexed); break; }
-            default:
-            {
-                qWarning() << "entity_data_manager: unknown fetch action type " << std::to_underlying(fd.action);
-                action_success = false;
-            }
-            }
-
-            if (returning_actions.contains(fd.action))
-            {
-                action_success = item.valid();
-                return_item = true;
-            }
-            
-            ok = action_success && ok;
-            if (action_success)
-            {
-                if (return_item)
-                {
-                    m_adjust_count(fd.query, item, true);
-                    items.emplace_back(std::move(item));
-                }
-                ++fd.query.processed;
-
-                // we expect url to occur exactly once in urls
-                auto new_end = std::remove(urls_remaining.begin(), urls_remaining.end(), url);
-                urls_remaining.erase(new_end, urls_remaining.end());
-                urls_processed.push_back(url);
-            }
-            else
-            { urls_failed.push_back(url); }
-
-            if (t.hasExpired(static_cast<qint64>(m_deadline)))
-            {
-                if (items.size())
-                {
-                    if (fd.is_update)
-                    { emit update_available(fd.query, items); }
-                    else
-                    { emit data_available(fd.query, items); }
-                    items.clear();
-                }
-                if (urls_processed.size())
-                {
-                    emit fetch_progressed(fd, urls_processed);
-                    urls_processed.clear();
-                }
-                t.restart();
-            }
-        } // for (...)
-
-        if (ok)
-        {
-            fd.urls.clear();
-            fd.query.status = Completed;
-        }
-        else
-        { fd.urls = urls_remaining; }
-
-        if (items.size())
-        {
-            if (fd.is_update)
-            { emit update_available(fd.query, items); }
-            else
-            { emit data_available(fd.query, items); }
-        }
-        if (urls_processed.size())
-        {
-            emit fetch_progressed(fd, urls_processed);
-        }
-
-        if (urls_failed.size())
-        { emit fetch_failed(fd, urls_failed); }
-        
-        return ok;
-    }
-
-    bool rin::entity_data_manager::m_run_indexed_write_query(index_descriptor& ixd)
-    {
-        const QString& entity_id = ixd.query.text;
-        const std::filesystem::path path = entity_id.toStdString();
-        
-        QElapsedTimer t;
-        QList<std::tuple<QString, int>> processed;
-        QList<std::tuple<QString, QString>> failed;
-        processed.reserve(128); // TODO: get total amount of files/dirs to be tagged
-        ixd.query.status = query_descriptor::query_status::In_Progress;
-        
-        sz::metadata::tag_input(path, m_database, ixd.args,
-            [&](std::filesystem::path p, const std::vector<std::string>& tags, sz::result_code c) -> bool
-            {
-                Q_UNUSED(c);
-                qDebug() << "[entity_data_manager] tag item: " << p.string() << " with: " << tags;
-
-                ++ixd.query.size;
-                ++ixd.query.processed;
-                
-                if (std::filesystem::is_directory(p))
-                { ++ixd.query.dir_count; }
-                else
-                { ++ixd.query.file_count; }
-
-                processed.emplace_back(QString::fromStdString(p.string()), static_cast<int>(tags.size()));
-
-                if (t.hasExpired(static_cast<qint64>(m_deadline)))
-                {
-                    emit query_progressed(ixd.query, processed);
-                    processed.clear();
-                }
-
-                return false;
-            },
-            [&](std::string eid, std::string msg, sz::result_code c) -> bool
-            {
-                Q_UNUSED(c);
-                qWarning() << "[entity_data_manager] failed to apply tags: " << msg;
-                failed.emplace_back(QString::fromStdString(eid), QString::fromStdString(msg));
-
-                if (t.hasExpired(static_cast<qint64>(m_deadline)))
-                {
-                    emit query_failed(ixd.query, failed);
-                    failed.clear();
-                }
-
-                ++ixd.query.size;
-                return false;
-            }, false, false
-        );
-        
-        if (processed.size())
-        { emit query_progressed(ixd.query, processed); }
-        
-        if (failed.size())
-        { emit query_failed(ixd.query, failed); }
-
-        return true; // TODO: need a way of determining when this sort of query is completed, irrespective of user-error
-    }
-
-    // expects mutex to be in a locked state
-    // TODO: continue or cancel query in model if failed (based on user prompt)
-    bool entity_data_manager::m_exec(QMutex& mutex, const std::tuple<QString, query_descriptor::query_mode> job)
-    {
-        using enum query_descriptor::query_mode;
-        
-        const QString& query_string = std::get<0>(job);
-        const auto mode = std::get<1>(job);
-        bool job_completed = false;
-
-        // ################################# mutex unlock #################################
-        m_working = true;
-        mutex.unlock();
-        setTerminationEnabled(true); // underlying APIs may hang while getting data, allow termination now
-        if (mode == Fetch) // fetches take priority
-        {
-            job_completed = m_run_fetch_query(m_fetches.at(query_string));
-        }
-        else if (mode == Sort)
-        {
-            job_completed = m_run_sort_query(m_pending_sort.at(query_string), m_pending_sort_keys.at(query_string));
-        }
-        else if (mode == Read)
-        {
-            job_completed = m_run_read_query(m_nodes.at(query_string));
-        }
-        else if (mode == Read_Extended)
-        {
-            job_completed = m_run_extended_read_query(m_extended_reads.at(query_string), m_extended_read_positions.at(query_string));
-        }
-        else if (mode == Write)
-        {
-            // FIXME: we need to know the query type in order to avoid checking each map for a matching query
-            if (m_indexed_writes.contains(query_string))
-            {
-                job_completed = m_run_indexed_write_query(m_indexed_writes.at(query_string));
-            }
-        }
-        // ################################# mutex lock #################################
-        setTerminationEnabled(false); // we're about to grab the mutex, disable termination now
-        mutex.lock();
-
-        if (job_completed)
-        {
-            query_descriptor qd;
-            if (mode == Read)
-            {
-                qd = m_nodes[query_string].descriptor;
-                m_nodes.erase(query_string);
-                m_invalidated.erase(query_string);
-                m_sources.erase(query_string);
-            }
-            else if (mode == Read_Extended)
-            {
-                m_extended_reads.erase(query_string);
-                m_extended_read_positions.erase(query_string);
-            }
-            else if (mode == Sort)
-            {
-                m_pending_sort.erase(query_string);
-                m_pending_sort_keys.erase(query_string);
-            }
-            else if (mode == Fetch)
-            {
-                qd = m_fetches[query_string].query;
-                m_fetches.erase(query_string);
-            }
-            else if (mode == Write)
-            {
-                // FIXME: need to identify what kind of write query
-                if (m_indexed_writes.contains(query_string))
-                {
-                    qd = m_indexed_writes.at(query_string).query;
-                    m_indexed_writes.erase(query_string);
-                }
-            }
-
-            if (!(mode == Sort || mode == Read_Extended))
-            { emit query_done(std::move(qd)); }
-
-            m_queries.pop_front();
-        }
-
-        const bool work_pending = !m_queries.empty();
-
-        // ####### mutating of internal state not allowed past this point #######
-        m_working = false;
-        
-        if (isInterruptionRequested())
-        { return true; }
-        
-        m_no_work_being_performed.wakeAll(); // if there was a waiter, mutex is returned to this thread by waiter in a locked state
-        if (work_pending && m_do_interrupt.test())
-        {
-            m_do_interrupt.clear();
-
-            // wait to be told to continue working
-            qDebug() << "entity_data_manager: wait with work still pending";
-            m_continue_query.wait(&m_mutex);
-        }
-        return false;
-    }
-
-    void entity_data_manager::m_adjust_count(query_descriptor& qd, const reflexive_entity& e, bool increment)
-    {
-        qd.adjust(e, increment);
-    }
-
-    // for filesystem-based fetch queries, the parent dir of new_id is the same as qd.query_string
-    // TODO: if update_entity fails, we should undo the rename
+    // for filesystem-based queries, the parent dir of new_id is the same as qd.query_string
+    // TODO: if update_entity fails, should we undo the rename?
     reflexive_entity entity_data_manager::m_rename_file_entity(const QString& old_id, const QString& new_id, bool is_indexed)
     {
         reflexive_entity e;
+
         if (QFile::rename(old_id, new_id))
         {
             if (is_indexed)
@@ -1110,9 +646,9 @@ namespace rin
                 );
                 assert(result.code == sz::result_code::Success);
             }
-
             const QFileInfo info(new_id);
-            e = m_make_entity(info.absoluteDir().path(), new_id, info);
+
+            e = m_create_entity(info.absoluteDir().path(), new_id, info);
         }
         return e;
     }
@@ -1120,18 +656,22 @@ namespace rin
     reflexive_entity entity_data_manager::m_copy_file_entity(const QString& src_id, const QString& dst_id, bool is_indexed)
     {
         reflexive_entity e;
+
         if (QFile::copy(src_id, dst_id))
         {
             if (is_indexed)
             {
                 sz::entity_database_info entity_info = m_database.entity_info(src_id.toStdString());
+
                 entity_info.id = dst_id.toStdString();
+                
                 const sz::result_code rc = m_database.register_entity(entity_info);
+                
                 assert(rc == sz::result_code::Success);
             }
-
             const QFileInfo info(dst_id);
-            e = m_make_entity(info.absoluteDir().path(), dst_id, info);
+
+            e = m_create_entity(info.absoluteDir().path(), dst_id, info);
         }
         return e;
     }
@@ -1139,17 +679,17 @@ namespace rin
     reflexive_entity entity_data_manager::m_link_file_entity(const QString& id, const QString& target, bool is_indexed)
     {
         reflexive_entity e;
+
         if (QFile::link(id, target))
         {
             if (is_indexed)
             {
                 // TODO: how to handle this?
             }
-
             const QFileInfo info(target);
             
             // should entity type be File for symlinks?
-            e = m_make_entity(info.absoluteDir().path(), target, info);
+            e = m_create_entity(info.absoluteDir().path(), target, info);
         }
         return e;
     }
@@ -1160,11 +700,9 @@ namespace rin
         const bool removed = (info.isFile() || info.isSymLink()) ? QFile::remove(id) : QDir(id).removeRecursively();
 
         // TODO: delete_entity should return a bool indicating success
-        if (is_indexed)
-        {
+        if (is_indexed) {
             m_database.delete_entity(id.toStdString());
         }
-
         return removed;
     }
 
@@ -1185,12 +723,11 @@ namespace rin
 
         auto notify_for_update = [this](const QString& path) -> void
         {
-            qDebug() << "entity_datamanager: notify for update: " << path;
+            qDebug() << "entity_data_manager: notify for update: " << path;
             const QFileInfo info(path);
             const QString dir = info.isDir() ? path : info.canonicalPath();
-            emit query_needs_update(dir);
+            emit data_changed(QString::fromStdString(sz::entity_uri(dir.toStdString(), sz::entity_type::File)));
         };
-
         connect(watcher, &QFileSystemWatcher::directoryChanged, this, notify_for_update);
         connect(watcher, &QFileSystemWatcher::fileChanged, this, notify_for_update);
         return watcher;

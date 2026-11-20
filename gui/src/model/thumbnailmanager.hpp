@@ -17,6 +17,7 @@
 #include <suzuri/entity/database.hpp>
 #include <suzuri/plugin/plugin.hpp>
 #include "common.hpp"
+#include "descriptor.hpp"
 #include "entity.hpp"
 
 namespace rin

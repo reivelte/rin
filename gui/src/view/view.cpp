@@ -425,19 +425,38 @@ namespace rin
 
     void entity_view::sort_by_column(int column, Qt::SortOrder order)
     {
-        if (column < 0) // we don't support disabling of sort
-        { return; }
-
+        if (column < 0) { // we don't support disabling of sort
+            return;
+        }
         if (viewmode() == entity_view_mode::List)
         {
             auto* lv = m->as<list_mode*>();
+
             if (lv->header)
             {
                 lv->header->setSortIndicator(column, order);
                 emit sort_indicator_changed(column, order);
             }
+            if (m->model_is_entity_model)
+            {
+                auto* model = m->entity_model_ptr();
+
+                if (model->valid_index(lv->root_index))
+                {
+                    lv->traverse_tree([&](const QModelIndex& index) -> bool
+                    {
+                        model->sort(index, column, order);
+                        return false;
+                    }, lv->root_index, true);
+                }
+            }
+            else {
+                m->model->sort(column, order);
+            }
         }
-        m->model->sort(column, order);
+        else {
+            m->model->sort(column, order);
+        }
     }
 
     void entity_view::reset()

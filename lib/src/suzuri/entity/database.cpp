@@ -522,6 +522,14 @@ namespace sz
             // copied from tags(filesytem::path)
             return m_db.make_query("SELECT outset FROM link WHERE inset = ?", query.string.substr(file_uri.size()));
         }
+
+        if (query.get_similar)
+        {
+            return m_db.make_query(
+                "SELECT id FROM entity WHERE type = ? AND id GLOB ?",
+                TAG_ENTITY_TYPE, std::format("*{}*", query.string)
+            );
+        }
         
         // tag_query
         auto q = files(query);

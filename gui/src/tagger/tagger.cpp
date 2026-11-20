@@ -82,8 +82,8 @@ namespace rin
                 urls.push_back(url);
                 qDebug() << "[tagger] select: " << url;
             }
-            QModelIndex index = m_model->query("concept://untitled", urls);
-            m_view->setRootIndex(index);
+            // QModelIndex index = m_model->query("concept://untitled", urls);
+            // m_view->setRootIndex(index);
         }
     }
 
@@ -100,8 +100,8 @@ namespace rin
                 urls.push_back(url);
                 qDebug() << "[tagger] select: " << url;
             }
-            QModelIndex index = m_model->query("concept://untitled", urls);
-            m_view->setRootIndex(index);
+            // QModelIndex index = m_model->query("concept://untitled", urls);
+            // m_view->setRootIndex(index);
         }
     }
 

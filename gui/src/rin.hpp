@@ -4,8 +4,9 @@
 
 #pragma once
 #include <QtCore/qnamespace.h>
+#include <suzuri/types.hpp>
 
 namespace rin
 {
-
+    using namespace sz::primitive_types;
 }

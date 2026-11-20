@@ -13,6 +13,22 @@
 
 namespace sz::utility
 {
+    // FNV-1a 64 bit algorithm
+    // see: https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function#FNV-1a_hash
+    constexpr u64 hash_string(std::string_view x)
+    {   
+        static_assert(sizeof(u64) == 8);
+        
+        u64 result = 0xcbf29ce484222325; // offset basis
+
+        for (char c : x)
+        {
+            result ^= c;
+            result *= 0x100000001b3; // FNV prime
+        }
+        return result;
+    }
+
     template <typename T> requires (std::constructible_from<std::string, T> || std::is_same_v<char, T>)
     SZ_API constexpr std::string join(const std::string& on, const std::vector<T>& v, bool join_always = false)
     {

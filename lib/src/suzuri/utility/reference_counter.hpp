@@ -13,13 +13,13 @@ namespace sz
     class SZ_API reference_counter
     {
         public:
-        reference_counter();
-        reference_counter(reference_counter&& rhs);
+        reference_counter(); // starts a new count at 1
+        reference_counter(reference_counter&& rhs); // --this, then set this to rhs
         reference_counter(const reference_counter& rhs); // ++
         ~reference_counter(); // --
 
-        reference_counter& operator=(reference_counter&& rhs);
-        reference_counter& operator=(const reference_counter& rhs);
+        reference_counter& operator=(reference_counter&& rhs); // --this, then set this to rhs
+        reference_counter& operator=(const reference_counter& rhs); // --this, set this to rhs, ++this
         int operator*() const;
         operator int() const;
 
